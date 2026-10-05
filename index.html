@@ -1,0 +1,2316 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MetCards</title>
+
+    <!-- PWA / Apple -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="MetCards">
+    <link rel="apple-touch-icon" href="./icon.png">
+    <link rel="icon" type="image/png" href="./icon.png">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --color-primary: #38bdf8;
+            --color-dark: #e2e8f0;
+            --color-bg: #0f172a;
+            --card-bg: rgba(255,255,255,0.05);
+            --card-border: rgba(255,255,255,0.08);
+        }
+
+        html, body {
+            overscroll-behavior: none;
+            touch-action: none;
+            overflow: hidden;
+            position: fixed;
+            width: 100%;
+            height: 100%;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--color-bg);
+            color: #e2e8f0;
+            -webkit-tap-highlight-color: transparent;
+            transition: background-color 0.8s ease;
+        }
+
+        .ios-card {
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 24px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+            margin-bottom: 1rem;
+            overflow: hidden;
+            color: #e2e8f0;
+        }
+
+        .primary-gradient {
+            background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%);
+            color: white;
+        }
+
+        .heatmap-bar {
+            background: linear-gradient(to right, #3b82f6 0%, #22d3ee 33%, #fbbf24 66%, #f97316 100%);
+            height: 10px;
+            border-radius: 12px;
+            position: relative;
+        }
+
+        .heatmap-dot {
+            position: absolute;
+            top: 50%;
+            width: 16px;
+            height: 16px;
+            background: white;
+            border: 3px solid #347474;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            transition: left 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .quick-btn {
+            transition: all 0.2s;
+            background: rgba(255,255,255,0.08) !important;
+            border: 1px solid rgba(255,255,255,0.15) !important;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            color: rgba(255,255,255,0.85) !important;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3) !important;
+        }
+
+        .quick-btn:hover {
+            background: rgba(255,255,255,0.14) !important;
+            border-color: rgba(255,255,255,0.25) !important;
+        }
+
+        .quick-btn:active {
+            transform: scale(0.95);
+        }
+
+        .loading-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(255,255,255,0.9);
+            backdrop-filter: blur(5px);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.4s;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 4px solid #38bdf8;
+            border-top-color: transparent;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .search-input {
+            border: 2px solid transparent;
+            transition: border-color 0.3s;
+        }
+
+        .search-input:focus {
+            border-color: #38bdf8;
+            outline: none;
+        }
+
+    </style>
+</head>
+<body class="px-3 pb-2 max-w-md mx-auto" style="overflow:hidden;height:100%;touch-action:none">
+
+    <div id="loading" class="loading-overlay">
+        <div class="flex flex-col items-center">
+            <div class="spinner"></div>
+            <p class="mt-4 font-bold text-gray-400 text-[10px] tracking-[0.2em]">ADATOK FRISSÍTÉSE</p>
+        </div>
+    </div>
+
+    <!-- PAGE DOTS + NAV -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;margin-top:0.25rem;padding:0 2px">
+        <button onclick="window.goToPage(window._currentPage - 1)" id="nav-prev" style="background:none;border:none;color:rgba(255,255,255,0.4);font-size:18px;cursor:pointer;padding:2px 6px;transition:color 0.2s" aria-label="Előző">‹</button>
+        <div style="display:flex;align-items:center;gap:10px">
+            <div id="dot-0" style="width:18px;height:6px;border-radius:3px;background:rgba(255,255,255,0.9);transition:all 0.3s"></div>
+            <div id="dot-1" style="width:6px;height:6px;border-radius:3px;background:rgba(255,255,255,0.25);transition:all 0.3s"></div>
+            <div id="dot-2" style="width:6px;height:6px;border-radius:3px;background:rgba(255,255,255,0.25);transition:all 0.3s"></div>
+            <div id="dot-3" style="width:6px;height:6px;border-radius:3px;background:rgba(255,255,255,0.25);transition:all 0.3s"></div>
+            <div id="dot-4" style="width:6px;height:6px;border-radius:3px;background:rgba(255,255,255,0.25);transition:all 0.3s"></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:4px">
+            <button onclick="window.goToPage(window._currentPage + 1)" id="nav-next" style="background:none;border:none;color:rgba(255,255,255,0.4);font-size:18px;cursor:pointer;padding:2px 6px;transition:color 0.2s" aria-label="Következő">›</button>
+            <button onclick="document.getElementById('info-modal').style.display='flex'" style="background:none;border:none;color:rgba(255,255,255,0.2);font-size:13px;font-weight:700;cursor:pointer;padding:2px 6px;font-family:serif;font-style:italic;line-height:1">ℹ</button>
+        </div>
+    </div>
+
+    <!-- SWIPE CONTAINER -->
+    <div id="swipe-container" style="overflow:hidden;position:relative;height:calc(100dvh - 52px)">
+        <div id="swipe-inner" style="display:flex;transition:transform 0.35s cubic-bezier(0.4,0,0.2,1);will-change:transform">
+
+            <!-- PAGE 1: ADATOK -->
+            <div class="swipe-page" style="min-width:100%;width:100%;height:100%;overflow-y:auto;-webkit-overflow-scrolling:touch">
+    <!-- QUICK SELECTORS + SEARCH -->
+    <div style="display:flex;gap:0.5rem;margin-bottom:0.5rem;margin-top:0.5rem">
+        <button onclick="location.reload()" class="quick-btn py-2 px-3 rounded-xl whitespace-nowrap" style="flex:0 0 auto" aria-label="Főoldal">🏠</button>
+        <button onclick="fetchWeather('Miskolc')" class="quick-btn flex-1 py-2 px-2 rounded-xl text-xs font-bold whitespace-nowrap">Miskolc</button>
+        <button onclick="fetchWeather('Abádszalók')" class="quick-btn flex-1 py-2 px-2 rounded-xl text-xs font-bold whitespace-nowrap">Abádszalók</button>
+        <button onclick="fetchWeather('Vác')" class="quick-btn flex-1 py-2 px-2 rounded-xl text-xs font-bold whitespace-nowrap">Vác</button>
+        <button onclick="toggleSearch()" class="quick-btn py-2 px-3 rounded-xl whitespace-nowrap" style="flex:0 0 auto" aria-label="Keresés">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" style="width:16px;height:16px;display:block"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"/></svg>
+        </button>
+    </div>
+
+    <!-- SEARCH BOX -->
+    <div id="search-bar" class="hidden mb-3">
+        <div class="flex gap-2">
+            <input type="text" id="loc-input" placeholder="Keress várost..." class="search-input flex-grow p-3 rounded-2xl font-medium" style="background:rgba(255,255,255,0.11);border:2px solid rgba(255,255,255,0.1);color:#e2e8f0">
+            <button onclick="handleSearchClick()" style="padding:0.75rem 1.25rem;background:linear-gradient(135deg,#1e3a5f,#0f172a);color:white;border:1px solid rgba(255,255,255,0.15);font-weight:700;border-radius:1rem">OK</button>
+        </div>
+    </div>
+
+    <!-- MAIN WEATHER CARD -->
+    <section class="ios-card primary-gradient p-3 text-center shadow-2xl relative overflow-hidden">
+        <div class="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
+        
+        <div class="relative z-10">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:0.25rem">
+                <div>
+                    <h1 id="city-name" style="font-size:1.5rem;font-weight:800;letter-spacing:-0.025em;color:white;line-height:1.1">Vác</h1>
+                    <p id="current-date" style="font-size:9px;color:rgba(255,255,255,0.5);font-weight:700;text-transform:uppercase;letter-spacing:0.1em;margin-top:2px"></p>
+                </div>
+            </div>
+            <div class="mb-2" style="display:flex;align-items:center;justify-content:center;gap:0.5rem;">
+                <span id="main-icon" style="font-size:2.8rem;filter:drop-shadow(0 4px 8px rgba(0,0,0,0.3));line-height:1">☀️</span>
+                <div style="text-align:left">
+                    <div><span id="main-temp" class="text-5xl font-light tracking-tighter">--.-</span><span class="text-xl font-light">°C</span></div>
+                    <p id="main-condition" class="text-sm font-semibold mt-1" style="color:rgba(255,255,255,0.75)">Betöltés...</p>
+                </div>
+            </div>
+
+            <!-- HEATMAP -->
+            <div class="bg-black/10 backdrop-blur-md p-2 rounded-3xl border border-white/10">
+                <div style="display:flex;justify-content:space-between;font-size:10px;text-transform:uppercase;font-weight:900;opacity:0.85;margin-bottom:0.4rem;letter-spacing:0.1em">
+                    <span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>24:00</span>
+                </div>
+                <div class="heatmap-bar" id="heatmap-bar">
+                    <div id="heatmap-indicator" class="heatmap-dot" style="left: 0%;"></div>
+                </div>
+                <div style="position:relative;height:1.25rem;margin-top:0.3rem;font-size:0.8rem;font-weight:700">
+                    <span id="h-now"  style="position:absolute;left:21%;transform:translateX(-50%)">--°</span>
+                    <span id="h-mid"  style="position:absolute;left:50%;transform:translateX(-50%);opacity:0.7">--°</span>
+                    <span id="h-late" style="position:absolute;left:79%;transform:translateX(-50%);opacity:0.7">--°</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- EXTRA INFO GRID -->
+    <div class="ios-card mb-2" style="padding:0.5rem 0.75rem">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0">
+
+            <div style="display:flex;align-items:center;gap:0.4rem;padding:0.35rem 0">
+                <span style="font-size:1rem">💨</span>
+                <div>
+                    <p style="font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.08em">Szél</p>
+                    <p id="wind-speed" style="font-size:0.875rem;font-weight:800;color:#e2e8f0">--</p>
+                </div>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:0.4rem;padding:0.35rem 0">
+                <span style="font-size:1rem">💧</span>
+                <div>
+                    <p style="font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.08em">Pára</p>
+                    <p id="humidity" style="font-size:0.875rem;font-weight:800;color:#e2e8f0">--</p>
+                </div>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:0.4rem;padding:0.35rem 0">
+                <span style="font-size:1rem">🌡️</span>
+                <div>
+                    <p style="font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.08em">Hőérzet</p>
+                    <p id="feels-like" style="font-size:0.875rem;font-weight:800;color:#e2e8f0">--</p>
+                </div>
+            </div>
+
+            <div style="grid-column:1/3;display:flex;align-items:center;gap:0.4rem;padding:0.35rem 0;border-top:1px solid rgba(255,255,255,0.06);margin-top:0.25rem">
+                <span style="font-size:1rem">☀️</span>
+                <div>
+                    <p style="font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.08em">Napkelte · Nyugta</p>
+                    <p id="sun-times" style="font-size:0.875rem;font-weight:800;color:#e2e8f0">↑ -- &nbsp;&nbsp; ↓ --</p>
+                </div>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:0.4rem;padding:0.35rem 0;border-top:1px solid rgba(255,255,255,0.06);margin-top:0.25rem">
+                <span id="precip-icon" style="font-size:1rem">🌧️</span>
+                <div>
+                    <p style="font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.08em">Csapadék</p>
+                    <p id="precip-today" style="font-size:0.875rem;font-weight:800;color:#7dd3fc">--%</p>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- FORECAST PREVIEW -->
+    <section class="ios-card p-4">
+        <h2 class="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 mb-2">3 napos előrejelzés</h2>
+        <div id="forecast-list" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.5rem"></div>
+    </section>
+
+
+
+            </div>
+
+            <!-- PAGE 2: RADAR -->
+            <div class="swipe-page" style="min-width:100%;width:100%;height:100%;overflow-y:auto;-webkit-overflow-scrolling:touch">
+    <!-- RADAR -->
+    <div class="ios-card mb-2" style="overflow:hidden;position:relative;">
+        <div style="padding:0.4rem 0.75rem 0.4rem;">
+            <p style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:0.2em;color:#94a3b8;">🛰️ Csapadékradar</p>
+        </div>
+        <div style="position:relative;height:280px;">
+            <iframe id="radar-iframe"
+                src="https://www.rainviewer.com/map.html?loc=47.5,19.0,6&oFa=0&oC=0&oU=0&oCS=1&oF=0&oAP=1&rmt=4&c=1&o=83&lm=0&layer=radar&sm=1&sn=1&ts=2"
+                style="width:100%;height:100%;border:none;display:block"
+                allow="geolocation">
+            </iframe>
+            <!-- Átlátszó overlay: swipe közben lefedi az iframe-t hogy ne nyelje el a touch-ot -->
+            <div id="radar-overlay" style="position:absolute;inset:0;z-index:10;display:none"></div>
+        </div>
+    </div>
+
+    <!-- CSAPADÉK GRAFIKON -->
+    <div class="ios-card mb-2" style="padding:0.5rem 0.75rem 0.75rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
+            <p style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:0.2em;color:#94a3b8;">🌧️ Csapadék – 48 óra</p>
+            <div style="display:flex;gap:8px;align-items:center">
+                <span style="font-size:9px;color:rgba(125,211,252,0.7);display:flex;align-items:center;gap:3px">
+                    <span style="display:inline-block;width:16px;height:2px;background:rgba(125,211,252,0.6);border-radius:1px"></span>valószínűség %
+                </span>
+                <span style="font-size:9px;color:rgba(56,189,248,0.8);display:flex;align-items:center;gap:3px">
+                    <span style="display:inline-block;width:8px;height:8px;background:rgba(56,189,248,0.6);border-radius:1px"></span>mennyiség mm
+                </span>
+            </div>
+        </div>
+        <canvas id="precip-chart" style="width:100%;height:90px;display:block"></canvas>
+    </div>
+
+            </div>
+
+            <!-- PAGE 3: FOTÓS IDŐ -->
+            <div class="swipe-page" style="min-width:100%;width:100%;height:100%;overflow-y:auto;-webkit-overflow-scrolling:touch">
+
+    <!-- NAPÍV KÁRTYA belső lapozóval -->
+    <div id="photo-arc-card" class="ios-card mb-2" style="padding:0.5rem 0.75rem 0.75rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem">
+            <p style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:0.2em;color:#94a3b8;">📸 Fotós időablakok</p>
+            <div style="display:flex;align-items:center;gap:8px">
+                <button onclick="photoStep(-1)" style="background:none;border:none;color:rgba(255,255,255,0.4);font-size:16px;cursor:pointer;padding:0 4px">‹</button>
+                <span id="photo-day-label" style="font-size:10px;font-weight:700;color:#94a3b8;min-width:60px;text-align:center">Ma</span>
+                <button onclick="photoStep(1)" style="background:none;border:none;color:rgba(255,255,255,0.4);font-size:16px;cursor:pointer;padding:0 4px">›</button>
+            </div>
+        </div>
+        <div style="overflow:hidden">
+            <div id="photo-inner" style="display:flex;transition:transform 0.35s cubic-bezier(0.4,0,0.2,1)">
+                <div style="min-width:100%;width:100%">
+                    <canvas id="sun-arc-0" style="width:100%;height:100px;display:block;margin-bottom:0.5rem"></canvas>
+                    <div id="photo-windows-0" style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem"></div>
+                </div>
+                <div style="min-width:100%;width:100%">
+                    <canvas id="sun-arc-1" style="width:100%;height:100px;display:block;margin-bottom:0.5rem"></canvas>
+                    <div id="photo-windows-1" style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem"></div>
+                </div>
+                <div style="min-width:100%;width:100%">
+                    <canvas id="sun-arc-2" style="width:100%;height:100px;display:block;margin-bottom:0.5rem"></canvas>
+                    <div id="photo-windows-2" style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FÉNY & LÉGKÖR KÁRTYA (egyesített) -->
+    <div class="ios-card mb-2" style="padding:0.5rem 0.75rem 0.75rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.6rem">
+            <p style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:0.2em;color:#94a3b8;">💡 Fény &amp; légkör</p>
+            <span id="fog-day-label" style="font-size:10px;font-weight:700;color:#94a3b8;">Ma</span>
+        </div>
+        <!-- Láthatóság mini chart -->
+        <canvas id="fog-chart" style="width:100%;height:56px;display:block;margin-bottom:0.6rem"></canvas>
+        <!-- Lapozható tartalom -->
+        <div style="overflow:hidden">
+            <div id="light-inner" style="display:flex;transition:transform 0.35s cubic-bezier(0.4,0,0.2,1)">
+                <div style="min-width:100%;width:100%">
+                    <div id="light-quality-0" style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;margin-bottom:0.4rem"></div>
+                    <div id="fog-stats-0"     style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem"></div>
+                </div>
+                <div style="min-width:100%;width:100%">
+                    <div id="light-quality-1" style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;margin-bottom:0.4rem"></div>
+                    <div id="fog-stats-1"     style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem"></div>
+                </div>
+                <div style="min-width:100%;width:100%">
+                    <div id="light-quality-2" style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;margin-bottom:0.4rem"></div>
+                    <div id="fog-stats-2"     style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+            </div>
+
+            <!-- PAGE 4: ÉJSZAKAI / ASZTRO -->
+            <div class="swipe-page" style="min-width:100%;width:100%;height:100%;overflow-y:auto;-webkit-overflow-scrolling:touch">
+
+    <!-- HOLD KÁRTYA -->
+    <div class="ios-card mb-2" style="padding:0.5rem 0.75rem 0.75rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.6rem">
+            <p style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:0.2em;color:#94a3b8;">🌙 Hold</p>
+            <span id="moon-phase-label" style="font-size:11px;font-weight:700;color:#e2e8f0;">--</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:1rem;margin-bottom:0.6rem">
+            <canvas id="moon-canvas" width="72" height="72" style="flex-shrink:0"></canvas>
+            <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:0.4rem" id="moon-stats"></div>
+        </div>
+        <!-- 7 napos hold fázis csík -->
+        <div id="moon-week" style="display:flex;justify-content:space-between;align-items:center;padding-top:0.4rem;border-top:1px solid rgba(255,255,255,0.06)"></div>
+    </div>
+
+    <!-- SZÜRKÜLET KÁRTYA -->
+    <div class="ios-card mb-2" style="padding:0.5rem 0.75rem 0.75rem;">
+        <p style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:0.2em;color:#94a3b8;margin-bottom:0.6rem;">🌆 Szürkület & sötétség</p>
+        <canvas id="twilight-canvas" style="width:100%;height:36px;display:block;margin-bottom:0.6rem"></canvas>
+        <div id="twilight-stats"></div>
+    </div>
+
+            </div>
+
+            <!-- PAGE 5: VÍZÁLLÁS -->
+            <div class="swipe-page" style="min-width:100%;width:100%;height:100%;overflow-y:auto;-webkit-overflow-scrolling:touch">
+
+    <!-- LEGKÖZELEBBI ÁLLOMÁS KÁRTYA -->
+    <div class="ios-card mb-2" style="padding:0.5rem 0.75rem 0.75rem;">
+        <!-- Fejléc -->
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.6rem">
+            <p style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:0.2em;color:#94a3b8;">🌊 Vízállás</p>
+            <span id="vizallas-time" style="font-size:9px;color:#8b9ab0"></span>
+        </div>
+
+        <!-- Tabok -->
+        <div style="display:flex;gap:0.3rem;margin-bottom:0.6rem">
+            <button id="vtab-kozel"   onclick="setVizTab('kozel')"   style="font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;border:none;cursor:pointer;background:rgba(255,255,255,0.9);color:#0f172a;transition:all 0.2s">📍 Közel</button>
+            <button id="vtab-kereses" onclick="setVizTab('kereses')" style="font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;border:1px solid rgba(255,255,255,0.15);cursor:pointer;background:transparent;color:rgba(255,255,255,0.5);transition:all 0.2s">🔍 Keresés</button>
+        </div>
+
+        <!-- Kereső (csak kereső tab-on látszik) -->
+        <div id="vizallas-search-row" style="display:none;margin-bottom:0.5rem">
+            <input id="vizallas-search-input" type="text" placeholder="Folyó vagy állomás neve..."
+                oninput="vizallasSearch(this.value)"
+                style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.11);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:6px 10px;font-size:12px;color:#e2e8f0;outline:none;font-family:inherit">
+        </div>
+
+        <!-- Lista — fix magasság, belső scroll -->
+        <div id="vizallas-list" style="display:flex;flex-direction:column;gap:0.35rem;max-height:calc(100dvh - 220px);overflow-y:auto;-webkit-overflow-scrolling:touch">
+            <div style="font-size:11px;color:#8b9ab0;text-align:center;padding:1rem">Betöltés...</div>
+        </div>
+    </div>
+
+            </div>
+
+        </div>
+    </div>
+
+
+
+    <!-- INFO MODAL -->
+    <div id="info-modal" onclick="this.style.display='none'" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;align-items:center;justify-content:center;padding:1.5rem">
+        <div onclick="event.stopPropagation()" style="background:#0f172a;border:1px solid rgba(255,255,255,0.12);border-radius:20px;padding:1.25rem 1.5rem;max-width:340px;width:100%;max-height:85vh;overflow-y:auto">
+
+            <!-- FEJLÉC + VERZIÓ -->
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem">
+                <a href="https://70hz.hu" target="_blank" style="color:#38bdf8;text-decoration:none;font-weight:900;font-size:16px">70Hz.hu</a>
+                <button onclick="document.getElementById('info-modal').style.display='none'" style="background:none;border:none;color:rgba(255,255,255,0.4);font-size:20px;cursor:pointer;line-height:1">×</button>
+            </div>
+            <div style="margin-bottom:1rem">
+                <span style="font-size:10px;font-weight:700;color:#7a8fa6;background:rgba(255,255,255,0.08);padding:2px 8px;border-radius:20px;border:1px solid rgba(255,255,255,0.08)" id="app-version-label">Béta · v0.9.6</span>
+            </div>
+
+            <!-- OLDALAK -->
+            <div style="margin-bottom:1rem">
+                <p style="font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:0.15em;color:#8b9ab0;margin-bottom:0.5rem">Oldalak</p>
+                <div style="display:flex;flex-direction:column;gap:0.4rem">
+                    <div style="font-size:11px;color:#94a3b8;line-height:1.6"><span style="color:#e2e8f0;font-weight:700">☁️ Időjárás</span> — Aktuális hőmérséklet, szél, páratartalom. 7 napos előrejelzés és csapadék grafikon.</div>
+                    <div style="font-size:11px;color:#94a3b8;line-height:1.6"><span style="color:#e2e8f0;font-weight:700">🌧️ Radar</span> — Élő csapadékradar (RainViewer). Automatikusan animál.</div>
+                    <div style="font-size:11px;color:#94a3b8;line-height:1.6"><span style="color:#e2e8f0;font-weight:700">📸 Fotós</span> — Napfelkelte/napnyugta, arany óra, kék óra, köd és láthatóság. 3 napos előrejelzés — középen húzva lapoz, szélén következő oldal.</div>
+                    <div style="font-size:11px;color:#94a3b8;line-height:1.6"><span style="color:#e2e8f0;font-weight:700">🌙 Éjszakai</span> — Holdfázis, megvilágítás %, szürkületi időablakok csillagászati fotózáshoz.</div>
+                    <div style="font-size:11px;color:#94a3b8;line-height:1.6"><span style="color:#e2e8f0;font-weight:700">🌊 Vízállás</span> — GPS alapján legközelebbi 3 mérőpont, valós vízállás cm, vízhozam m³/s, vízhőmérséklet, készültségi fokozat. Keresés folyóra vagy állomásra.</div>
+                </div>
+            </div>
+
+            <!-- FOTÓS ÉRTÉKELÉSEK -->
+            <div style="margin-bottom:1rem">
+                <p style="font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:0.15em;color:#8b9ab0;margin-bottom:0.5rem">Fotós értékelések</p>
+                <div style="display:flex;flex-direction:column;gap:0.3rem">
+                    <div style="font-size:11px;color:#94a3b8"><span style="color:#f59e0b">Arany óra</span> — Napkelte/napnyugta körüli ~30 perc, meleg fény, hosszú árnyékok.</div>
+                    <div style="font-size:11px;color:#94a3b8"><span style="color:#60a5fa">Kék óra</span> — Napkelte előtt / napnyugta után ~20 perc, lágy kékeslila fény.</div>
+                    <div style="font-size:11px;color:#94a3b8"><span style="color:#a78bfa">Szürkület</span> — Civil / nautikai / csillagászati fokozatok. Minél sötétebb, annál több csillag látszik.</div>
+                    <div style="font-size:11px;color:#94a3b8"><span style="color:#e2e8f0">⭐⭐⭐⭐⭐</span> — Kiváló &nbsp;·&nbsp; <span style="color:#e2e8f0">⭐</span> — Gyenge</div>
+                </div>
+            </div>
+
+            <!-- LÁTHATÓSÁG -->
+            <div style="margin-bottom:1rem">
+                <p style="font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:0.15em;color:#8b9ab0;margin-bottom:0.5rem">Láthatóság / Köd</p>
+                <div style="display:flex;flex-direction:column;gap:0.3rem">
+                    <div style="font-size:11px;color:#94a3b8">&lt; 1 km — <span style="color:#f87171">Sűrű köd</span>, fotózás korlátozott</div>
+                    <div style="font-size:11px;color:#94a3b8">1–5 km — <span style="color:#fb923c">Köd / pára</span>, lágy diffúz fény</div>
+                    <div style="font-size:11px;color:#94a3b8">5–20 km — <span style="color:#facc15">Párás</span>, kontrasztos égbolt</div>
+                    <div style="font-size:11px;color:#94a3b8">&gt; 20 km — <span style="color:#4ade80">Tiszta</span>, éles részletek</div>
+                </div>
+            </div>
+
+            <!-- HOLD -->
+            <div style="margin-bottom:1rem">
+                <p style="font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:0.15em;color:#8b9ab0;margin-bottom:0.5rem">Hold fotózáshoz</p>
+                <div style="font-size:11px;color:#94a3b8;line-height:1.7">
+                    🌑 Újhold — sötét ég, csillagok, Tejút<br>
+                    🌓 Negyed — este sötét, hajnal előtt hold<br>
+                    🌕 Telihold — erős megvilágítás, halvány csillagok<br>
+                    Hold alatti láthatóság ⭐⭐⭐⭐⭐ → ⭐
+                </div>
+            </div>
+
+            <!-- VÍZÁLLÁS -->
+            <div style="margin-bottom:1rem">
+                <p style="font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:0.15em;color:#8b9ab0;margin-bottom:0.5rem">Vízállás jelzők</p>
+                <div style="display:flex;flex-direction:column;gap:0.3rem">
+                    <div style="font-size:11px;color:#94a3b8"><span style="color:#4ade80;font-weight:700">Normal</span> — Nincs készültség</div>
+                    <div style="font-size:11px;color:#94a3b8"><span style="color:#facc15;font-weight:700">I. fok</span> — Figyelési készültség</div>
+                    <div style="font-size:11px;color:#94a3b8"><span style="color:#fb923c;font-weight:700">II. fok</span> — Védelmi készültség</div>
+                    <div style="font-size:11px;color:#f87171;font-weight:700">III. fok</span> — Védelmi tetőfok</div>
+                    <div style="font-size:11px;color:#94a3b8">A kék csík és az I/II/III vonalak mutatják a vízállás arányát a készültségi szintekhez.</div>
+                </div>
+            </div>
+
+            <!-- ADATFORRÁSOK -->
+            <p style="font-size:10px;color:#7a8fa6;line-height:2;border-top:1px solid rgba(255,255,255,0.06);padding-top:0.75rem">
+                <a href="https://open-meteo.com" target="_blank" style="color:#8b9ab0;text-decoration:none">Open-Meteo</a> ·
+                <a href="https://rainviewer.com" target="_blank" style="color:#8b9ab0;text-decoration:none">RainViewer</a> ·
+                <a href="https://nominatim.org" target="_blank" style="color:#8b9ab0;text-decoration:none">Nominatim</a> ·
+                <a href="https://geoportal.vizugy.hu" target="_blank" style="color:#8b9ab0;text-decoration:none">OVF Vízügyi</a> ·
+                <a href="https://claude.ai" target="_blank" style="color:#8b9ab0;text-decoration:none">Claude AI</a>
+            </p>
+        </div>
+    </div>
+
+    <script>
+        const APP_VERSION = 'v0.9.6';
+        const API_GEO = "https://geocoding-api.open-meteo.com/v1/search";
+        const API_WEATHER = "https://api.open-meteo.com/v1/forecast";
+
+        function toggleSearch() {
+            const bar = document.getElementById('search-bar');
+            bar.classList.toggle('hidden');
+            if (!bar.classList.contains('hidden')) document.getElementById('loc-input').focus();
+        }
+
+        function handleSearchClick() {
+            const input = document.getElementById('loc-input');
+            if (input.value.trim()) {
+                fetchWeather(input.value.trim());
+                input.value = "";
+            }
+        }
+
+        // FIX #3: Enter billentyű kezelése
+        document.getElementById('loc-input').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') handleSearchClick();
+        });
+
+        async function fetchWeatherByCoords(lat, lon) {
+            showLoader(true);
+            try {
+                // Fordított geocoding Nominatim-mal (pontosabb városnév)
+                let name = 'Ismeretlen helyszín';
+                try {
+                    const nomRes  = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=hu`);
+                    const nomData = await nomRes.json();
+                    const a = nomData.address;
+                    name = a.city || a.town || a.village || a.hamlet || a.county || 'Ismeretlen helyszín';
+                } catch(e) {}
+
+                const wRes  = await fetch(`${API_WEATHER}?latitude=${lat}&longitude=${lon}&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m,cloud_cover&hourly=temperature_2m,precipitation,precipitation_probability,visibility,dewpoint_2m,cloudcover_low,cloudcover_mid,cloudcover_high&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset&timezone=auto`);
+                const wData = await wRes.json();
+
+                updateUI(name, wData);
+                // Koordináták mentése — vízállás közel listához
+                window._userLat = lat;
+                window._userLon = lon;
+                if (window._vizFeatures) {
+                    window.computeVizKozel(window._vizFeatures);
+                    if (window._currentPage === 4 && window.getVizActiveTab?.() === 'kozel') window.renderVizTab?.();
+                }
+                const iframe = document.getElementById('radar-iframe');
+                if (iframe) iframe.src = `https://www.rainviewer.com/map.html?loc=${lat},${lon},6&oFa=0&oC=0&oU=0&oCS=1&oF=0&oAP=1&rmt=4&c=1&o=83&lm=0&layer=radar&sm=1&sn=1&ts=2`;
+            } catch(err) {
+                fetchWeather('Vác');
+            } finally {
+                showLoader(false);
+                document.getElementById('search-bar').classList.add('hidden');
+            }
+        }
+
+        async function fetchWeather(cityName = "Vác") {
+            showLoader(true);
+
+            try {
+                // 1. Geocoding
+                const geoRes = await fetch(`${API_GEO}?name=${encodeURIComponent(cityName)}&count=1&language=hu&format=json`);
+                const geoData = await geoRes.json();
+                
+                if (!geoData.results || geoData.results.length === 0) throw new Error("A megadott település nem található.");
+                const { latitude, longitude, name, utc_offset_seconds } = geoData.results[0];
+
+                // Mentjük a keresett város koordinátáit — vízállás közel listához
+                window._userLat = latitude;
+                window._userLon = longitude;
+                if (window._vizFeatures) {
+                    window.computeVizKozel(window._vizFeatures);
+                    if (window._currentPage === 4 && window.getVizActiveTab?.() === 'kozel') window.renderVizTab?.();
+                }
+
+                // 2. Weather
+                const weatherRes = await fetch(`${API_WEATHER}?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m,cloud_cover&hourly=temperature_2m,precipitation,precipitation_probability,visibility,dewpoint_2m,cloudcover_low,cloudcover_mid,cloudcover_high&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset&timezone=auto`);
+                const weatherData = await weatherRes.json();
+
+                updateUI(name, weatherData);
+                const iframe2 = document.getElementById('radar-iframe');
+                if (iframe2) iframe2.src = `https://www.rainviewer.com/map.html?loc=${latitude},${longitude},6&oFa=0&oC=0&oU=0&oCS=1&oF=0&oAP=1&rmt=4&c=1&o=83&lm=0&layer=radar&sm=1&sn=1&ts=2`;
+            } catch (err) {
+                alert(err.message);
+            } finally {
+                showLoader(false);
+                document.getElementById('search-bar').classList.add('hidden');
+            }
+        }
+
+        function updateUI(cityName, data) {
+            // FIX #7: try/catch az updateUI-ban
+            try {
+                document.getElementById('city-name').innerText = cityName;
+                
+                const current = data.current;
+                document.getElementById('main-temp').innerText = current.temperature_2m.toFixed(1);
+                document.getElementById('wind-speed').innerText = Math.round(current.wind_speed_10m) + " km/h";
+                document.getElementById('humidity').innerText = current.relative_humidity_2m + "%";
+
+                // Ha weather_code derültet mutat, de cloud_cover magas → korrigálunk
+                const cloudPct = current.cloud_cover ?? null;
+                let displayCode = current.weather_code;
+                if (cloudPct !== null && current.weather_code <= 2) {
+                    if (cloudPct >= 80) displayCode = 3;       // borult
+                    else if (cloudPct >= 50) displayCode = 2;  // részben felhős
+                    else if (cloudPct >= 25) displayCode = 1;  // túlnyomóan derült
+                }
+
+                document.getElementById('main-condition').innerText = getWeatherDesc(displayCode);
+                document.getElementById('main-icon').innerText = getWeatherIcon(displayCode);
+                updateFavicon(displayCode);
+
+                // Dinamikus gradiens az időjárás kód alapján
+                const grad = getWeatherGradient(displayCode);
+                document.querySelector('.primary-gradient').style.background = grad;
+                document.body.style.background = getBodyBg(displayCode);
+
+                document.getElementById('feels-like').innerText = 
+                    (current.apparent_temperature != null) 
+                    ? current.apparent_temperature.toFixed(1) + "°C" 
+                    : "--°C";
+
+                // Napkelte / napnyugta (mai nap, index 0)
+                const daily = data.daily;
+                const sunriseRaw = daily.sunrise && daily.sunrise[0] ? daily.sunrise[0] : null;
+                const sunsetRaw  = daily.sunset  && daily.sunset[0]  ? daily.sunset[0]  : null;
+                // Az API "2025-03-04T06:12" formátumban adja vissza
+                const fmtTime = str => {
+                    if (!str) return "--:--";
+                    // Keresünk T-t, utána 5 karakter = HH:MM
+                    const tIdx = str.indexOf("T");
+                    return tIdx !== -1 ? str.substring(tIdx + 1, tIdx + 6) : str.substring(11, 16);
+                };
+                document.getElementById('sun-times').innerText = "↑ " + fmtTime(sunriseRaw) + "   ↓ " + fmtTime(sunsetRaw);
+
+                // Fotós időablakok - 3 nap
+                const photoSunrises = daily.sunrise ? daily.sunrise.slice(0,3) : [];
+                const photoSunsets  = daily.sunset  ? daily.sunset.slice(0,3)  : [];
+                const photoWeatherCodes = daily.weather_code ? daily.weather_code.slice(0,3) : [current.weather_code, current.weather_code, current.weather_code];
+
+                const precipToday = daily.precipitation_probability_max?.[0] ?? "--";
+                document.getElementById('precip-today').innerText = precipToday + "%";
+                document.getElementById('precip-icon').innerText = getPrecipIcon(daily.weather_code?.[0]);
+
+                // Hourly adatok
+                const hourlyTimes = data.hourly.time;
+                const hourlyTemps = data.hourly.temperature_2m;
+                const hourlyPrecip    = data.hourly.precipitation || [];
+                const hourlyProb      = data.hourly.precipitation_probability || [];
+                const hourlyVis       = data.hourly.visibility || [];
+                const hourlyDewpoint  = data.hourly.dewpoint_2m || [];
+                const hourlyCldLow    = data.hourly.cloudcover_low || [];
+                const hourlyCldMid    = data.hourly.cloudcover_mid || [];
+                const hourlyCldHigh   = data.hourly.cloudcover_high || [];
+                const hourlyHumidity  = data.hourly.relative_humidity_2m || [];
+                const todayStr = data.current.time.substring(0, 10);
+
+                // Fotós oldal — hourly adatok után hívjuk
+                updatePhotoPage(photoSunrises, photoSunsets, photoWeatherCodes, hourlyTimes, hourlyCldLow, hourlyCldMid, hourlyCldHigh, todayStr);
+
+                // Csapadék grafikon
+                drawPrecipChart(hourlyTimes, hourlyPrecip, hourlyProb, todayStr);
+
+                // Köd / láthatóság kártya
+                updateFogCard(hourlyTimes, hourlyVis, hourlyDewpoint, hourlyCldLow, hourlyCldMid, hourlyCldHigh, todayStr, photoSunrises, photoSunsets);
+
+                // Éjszakai / asztro oldal
+                updateNightPage(photoSunrises, photoSunsets, data.current.time);
+
+                // Megkeressük az adott nap 08:00, 14:00, 20:00 indexeit
+                const idx8  = hourlyTimes.indexOf(`${todayStr}T05:00`);
+                const idx14 = hourlyTimes.indexOf(`${todayStr}T12:00`);
+                const idx20 = hourlyTimes.indexOf(`${todayStr}T19:00`);
+
+                const t8  = idx8  !== -1 ? hourlyTemps[idx8]  : null;
+                const t14 = idx14 !== -1 ? hourlyTemps[idx14] : null;
+                const t20 = idx20 !== -1 ? hourlyTemps[idx20] : null;
+
+                document.getElementById('h-now').innerText  = t8  !== null ? t8.toFixed(1)  + "°" : "--°";
+                document.getElementById('h-mid').innerText  = t14 !== null ? t14.toFixed(1) + "°" : "--°";
+                document.getElementById('h-late').innerText = t20 !== null ? t20.toFixed(1) + "°" : "--°";
+
+                // Dinamikus heatmap gradiens az óránkénti hőmérsékletekből
+                const dayTemps = [];
+                for (let h = 0; h < 24; h++) {
+                    const key = `${todayStr}T${String(h).padStart(2,'0')}:00`;
+                    const idx = hourlyTimes.indexOf(key);
+                    dayTemps.push(idx !== -1 ? hourlyTemps[idx] : null);
+                }
+                const gradStops = dayTemps.map((t, h) => {
+                    if (t === null) return null;
+                    const pct = (h / 23 * 100).toFixed(1);
+                    return `${tempToColor(t)} ${pct}%`;
+                }).filter(Boolean);
+                if (gradStops.length) {
+                    document.getElementById('heatmap-bar').style.background =
+                        `linear-gradient(to right, ${gradStops.join(', ')})`;
+                }
+
+                // Heatmap pötty pozíció = aktuális idő (0:00 → 100%)
+                const now = new Date();
+                const timePct = ((now.getHours() + now.getMinutes() / 60) / 24) * 100;
+                document.getElementById('heatmap-indicator').style.left = timePct.toFixed(2) + '%';
+
+                // Pötty automatikus frissítése percenként
+                if (window._timeUpdateTimer) clearInterval(window._timeUpdateTimer);
+                window._timeUpdateTimer = setInterval(() => {
+                    const n = new Date();
+                    const pct = ((n.getHours() + n.getMinutes() / 60) / 24) * 100;
+                    document.getElementById('heatmap-indicator').style.left = pct.toFixed(2) + '%';
+                }, 60000);
+
+                // Daily Forecast
+                let forecastHTML = "";
+                for (let i = 1; i <= 3; i++) {
+                    const date = parseDate(daily.time[i] + "T12:00:00");
+                    const dayName = fmtDay(date);
+                    const precip = daily.precipitation_probability_max[i] ?? "--";
+                    forecastHTML += `
+                        <div style="display:flex;flex-direction:column;align-items:center;gap:0.25rem;padding:0.6rem 0.25rem;background:rgba(255,255,255,0.11);border:1px solid rgba(255,255,255,0.11);border-radius:16px;text-align:center">
+                            <p style="font-size:10px;font-weight:800;color:rgba(255,255,255,0.8);text-transform:uppercase;letter-spacing:0.05em">${dayName}</p>
+                            <p style="font-size:9px;font-weight:600;color:rgba(255,255,255,0.3)">${date.getMonth()+1}/${date.getDate()}</p>
+                            <span style="font-size:1.75rem;line-height:1;margin:0.15rem 0">${getWeatherIcon(daily.weather_code[i])}</span>
+                            <div>
+                                <span style="font-size:0.875rem;font-weight:800;color:#e2e8f0">${daily.temperature_2m_max[i].toFixed(0)}°</span>
+                                <span style="font-size:0.75rem;font-weight:600;color:rgba(255,255,255,0.55);margin-left:3px">${daily.temperature_2m_min[i].toFixed(0)}°</span>
+                            </div>
+                            <p style="font-size:10px;font-weight:700;color:#7dd3fc">${getPrecipIcon(daily.weather_code[i])} ${precip}%</p>
+                        </div>
+                    `;
+                }
+                document.getElementById('forecast-list').innerHTML = forecastHTML;
+                document.getElementById('current-date').innerText = fmtFullDate(new Date());
+
+            } catch (err) {
+                console.error("UI frissítési hiba:", err);
+                // Csendes hiba — ne szakítsa meg a felhasználót alert-tel
+            }
+        }
+
+        // Hőmérséklet → szín interpoláció a heatmap gradienshez
+        function tempToColor(t) {
+            const stops = [
+                { t: -5,  r: 59,  g: 130, b: 246 },  // kék
+                { t: 10,  r: 34,  g: 211, b: 238 },  // cián
+                { t: 22,  r: 251, g: 191, b: 36  },  // sárga
+                { t: 35,  r: 249, g: 115, b: 22  },  // narancs
+            ];
+            if (t <= stops[0].t) return `rgb(${stops[0].r},${stops[0].g},${stops[0].b})`;
+            if (t >= stops[stops.length-1].t) { const s = stops[stops.length-1]; return `rgb(${s.r},${s.g},${s.b})`; }
+            for (let i = 0; i < stops.length - 1; i++) {
+                if (t >= stops[i].t && t <= stops[i+1].t) {
+                    const ratio = (t - stops[i].t) / (stops[i+1].t - stops[i].t);
+                    return `rgb(${Math.round(stops[i].r + ratio*(stops[i+1].r-stops[i].r))},${Math.round(stops[i].g + ratio*(stops[i+1].g-stops[i].g))},${Math.round(stops[i].b + ratio*(stops[i+1].b-stops[i].b))})`;
+                }
+            }
+        }
+
+        // Időjárás alapú kártya gradiens (sötét paletta)
+        function getWeatherGradient(code) {
+            if (code === 0)        return 'linear-gradient(135deg, #1a3a6b 0%, #0c1f3f 100%)'; // tiszta nap - mélykék
+            if (code <= 2)         return 'linear-gradient(135deg, #1e3a5f 0%, #162d4a 100%)'; // derült - acélkék
+            if (code === 3)        return 'linear-gradient(135deg, #2d3748 0%, #1a202c 100%)'; // borult - palaszürke
+            if (code <= 49)        return 'linear-gradient(135deg, #2d3a4a 0%, #1a2535 100%)'; // köd - ólomszürke
+            if (code <= 69)        return 'linear-gradient(135deg, #1e3050 0%, #0f1f36 100%)'; // eső - viharoskék
+            if (code <= 79)        return 'linear-gradient(135deg, #2a3a4f 0%, #1a2a3f 100%)'; // hó - jeges acél
+            if (code <= 84)        return 'linear-gradient(135deg, #1a2f4a 0%, #0f1f30 100%)'; // zápor - sötétkék
+            if (code <= 86)        return 'linear-gradient(135deg, #263545 0%, #1a2535 100%)'; // hózápor - szürkeacél
+            return                        'linear-gradient(135deg, #2d1f4a 0%, #1a0f2e 100%)'; // zivatar - viharos lila
+        }
+
+        // Időjárás alapú body háttér
+        function getBodyBg(code) {
+            if (code === 0)  return '#0a1628'; // tiszta - sötétkék
+            if (code <= 2)   return '#0c1a2e'; // derült
+            if (code === 3)  return '#111827'; // borult - sötétszürke
+            if (code <= 49)  return '#0f1a25'; // köd
+            if (code <= 69)  return '#0a1520'; // eső - mély éjkék
+            if (code <= 79)  return '#111c28'; // hó
+            if (code <= 86)  return '#0f1a28'; // zápor/hózápor
+            return                   '#120a1e'; // zivatar - sötétlila
+        }
+
+        // Dinamikus favicon (tab ikon) időjárás alapján
+        function updateFavicon(weatherCode) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 64; canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+
+            // Háttér szín időjárás szerint
+            const bg = weatherCode === 0 ? '#1a3a6b' :
+                       weatherCode <= 2  ? '#1e3a5f' :
+                       weatherCode === 3 ? '#2d3748' :
+                       weatherCode <= 69 ? '#1e3050' :
+                       weatherCode <= 79 ? '#2a3a4f' :
+                                           '#2d1f4a';
+
+            ctx.fillStyle = bg;
+            ctx.beginPath();
+            ctx.roundRect(0, 0, 64, 64, 14);
+            ctx.fill();
+
+            // Emoji ikon középre
+            ctx.font = '38px serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(getWeatherIcon(weatherCode), 32, 34);
+
+            // Favicon frissítése
+            const link = document.querySelector("link[rel='icon']") || document.createElement('link');
+            link.rel = 'icon'; link.type = 'image/png';
+            link.href = canvas.toDataURL('image/png');
+            document.head.appendChild(link);
+        }
+
+        // Csapadék típus ikon (csak a csapadék jellegére fókuszál)
+        function getPrecipIcon(code) {
+            if (code == null)      return "🌧️";
+            if (code <= 49)        return "🌧️";  // nincs csapadék / köd → általános
+            if (code <= 59)        return "🌦️";  // szitálás
+            if (code <= 69)        return "🌧️";  // eső
+            if (code <= 79)        return "❄️";  // havazás / hószemcsék
+            if (code <= 84)        return "🌦️";  // zápor
+            if (code <= 86)        return "🌨️";  // hózápor
+            if (code <= 89)        return "🌨️";  // jégeső
+            return "⛈️";                         // zivatar
+        }
+
+        // FIX #1: Javított WMO kód → ikon leképezés (pontosabb tartományok)
+        function getWeatherIcon(code) {
+            if (code === 0)               return "☀️";   // Tiszta
+            if (code <= 2)                return "🌤️";   // Túlnyomóan/részben derült
+            if (code === 3)               return "☁️";   // Borult
+            if (code <= 9)                return "🌫️";   // Köd, jelenségek
+            if (code <= 19)               return "🌦️";   // Csapadék közelben
+            if (code <= 29)               return "⛈️";   // Zivataros jelenségek
+            if (code <= 39)               return "🌬️";   // Porvihar, homokvihar
+            if (code <= 49)               return "🌫️";   // Köd, dér
+            if (code <= 59)               return "🌧️";   // Szitálás
+            if (code <= 69)               return "🌧️";   // Eső
+            if (code <= 79)               return "❄️";   // Havazás, hószemcsék
+            if (code <= 82)               return "🌦️";   // Zápor
+            if (code <= 84)               return "🌨️";   // Hózápor
+            if (code <= 86)               return "❄️";   // Erős hózápor
+            if (code <= 89)               return "🌨️";   // Jégeső zápor
+            if (code <= 94)               return "⛈️";   // Gyenge zivatar
+            return "⛈️";                                 // Erős zivatar
+        }
+
+        // FIX #2: Bővített WMO kód → szöveges leírás (teljesebb lefedés)
+        function getWeatherDesc(code) {
+            const map = {
+                0:  "Tiszta égbolt",
+                1:  "Túlnyomóan derült",
+                2:  "Részben felhős",
+                3:  "Borult",
+                45: "Ködös idő",
+                48: "Dérköd",
+                51: "Enyhe szitálás",
+                53: "Mérsékelt szitálás",
+                55: "Erős szitálás",
+                56: "Fagyos szitálás",
+                57: "Erős fagyos szitálás",
+                61: "Enyhe eső",
+                63: "Mérsékelt eső",
+                65: "Erős eső",
+                66: "Fagyos eső",
+                67: "Erős fagyos eső",
+                71: "Enyhe havazás",
+                73: "Mérsékelt havazás",
+                75: "Erős havazás",
+                77: "Hószemcsék",
+                80: "Enyhe záporeső",
+                81: "Mérsékelt záporeső",
+                82: "Erős záporeső",
+                85: "Hózápor",
+                86: "Erős hózápor",
+                95: "Zivatar",
+                96: "Zivatar jégesővel",
+                99: "Erős zivatar jégesővel",
+            };
+            // Ha pontosan megtalálható, visszaadjuk; ha nem, közelítünk tartomány alapján
+            if (map[code]) return map[code];
+            if (code <= 9)  return "Egyéb légköri jelenség";
+            if (code <= 19) return "Csapadék a közelben";
+            if (code <= 29) return "Viharos jelenség";
+            if (code <= 39) return "Porvihar";
+            if (code <= 49) return "Ködös idő";
+            if (code <= 59) return "Szitálás";
+            if (code <= 69) return "Esős idő";
+            if (code <= 79) return "Havazás";
+            if (code <= 84) return "Záporos idő";
+            if (code <= 94) return "Zivatarveszély";
+            return "Erős zivatar";
+        }
+
+        function showLoader(show) {
+            const loader = document.getElementById('loading');
+            if (show) {
+                loader.style.display = "flex";
+                loader.style.opacity = "1";
+            } else {
+                loader.style.opacity = "0";
+                setTimeout(() => loader.style.display = "none", 400);
+            }
+        }
+
+        // Init
+        // ── SWIPE NAVIGÁCIÓ ────────────────────────────────
+        // ───────────────────────────────────────────────────
+
+        // iOS-safe dátum formázók (toLocaleTimeString hu-HU nem működik iOS-on)
+        function fmt(d) {
+            if (!d || isNaN(d)) return '--:--';
+            return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+        }
+        const HU_DAYS  = ['Vas','Hét','Kedd','Sze','Csü','Pén','Szo'];
+        const HU_MONTHS = ['január','február','március','április','május','június','július','augusztus','szeptember','október','november','december'];
+        function fmtDay(d) {
+            if (!d || isNaN(d)) return '---';
+            return HU_DAYS[d.getDay()];
+        }
+        function fmtFullDate(d) {
+            if (!d || isNaN(d)) return '';
+            const days = ['vasárnap','hétfő','kedd','szerda','csütörtök','péntek','szombat'];
+            return HU_MONTHS[d.getMonth()] + ' ' + d.getDate() + '., ' + days[d.getDay()];
+        }
+
+        // iOS-safe dátum parse (Safari nem szereti a "2025-03-06T06:14" formátumot)
+        function parseDate(str) {
+            if (!str) return null;
+            // "2025-03-06T06:14" → "2025-03-06T06:14:00" + helyi zóna trükk
+            // Legjobb: számokra bontjuk és Date()-t hívunk explicit paraméterekkel
+            const m = String(str).match(/(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+            if (!m) return new Date(str);
+            return new Date(+m[1], +m[2]-1, +m[3], +m[4], +m[5], 0);
+        }
+
+        // ── FOTÓS IDŐABLAKOK ────────────────────────────────
+        let photoCurrentDay = 0;
+        const PHOTO_DAY_LABELS = ['Ma', 'Holnap', 'Holnapután'];
+
+        function photoStep(dir) {
+            photoCurrentDay = Math.max(0, Math.min(2, photoCurrentDay + dir));
+            const tx = 'translateX(-' + (photoCurrentDay * 100) + '%)';
+            document.getElementById('photo-inner').style.transform = tx;
+            document.getElementById('light-inner').style.transform = tx;
+            document.getElementById('photo-day-label').innerText = PHOTO_DAY_LABELS[photoCurrentDay];
+            const fogLabel = document.getElementById('fog-day-label');
+            if (fogLabel) fogLabel.innerText = PHOTO_DAY_LABELS[photoCurrentDay];
+            // nyíl gombok halványítása
+            const btns = document.querySelectorAll('[onclick^="photoStep"]');
+            if (btns[0]) btns[0].style.color = photoCurrentDay === 0 ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.7)';
+            if (btns[1]) btns[1].style.color = photoCurrentDay === 2 ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.7)';
+        }
+
+        function updatePhotoPage(sunrises, sunsets, weatherCodes, hourlyTimes, cldLow, cldMid, cldHigh, todayStr) {
+            if (!sunrises.length || !sunsets.length) return;
+            photoCurrentDay = 0;
+            document.getElementById('photo-inner').style.transform = 'translateX(0)';
+            document.getElementById('light-inner').style.transform = 'translateX(0)';
+            document.getElementById('photo-day-label').innerText = 'Ma';
+
+            // Napi átlagos felhőzet számítása az hourly adatokból
+            const dailyAvgCloud = [0,1,2].map(d => {
+                if (!hourlyTimes || !cldLow) return null;
+                const dStr = todayStr ? (() => {
+                    const base = new Date(todayStr + 'T00:00:00');
+                    base.setDate(base.getDate() + d);
+                    return base.toISOString().substring(0,10);
+                })() : null;
+                if (!dStr) return null;
+                const idxs = hourlyTimes.reduce((a,t,i) => t.startsWith(dStr) ? [...a,i] : a, []);
+                if (!idxs.length) return null;
+                const avg = arr => arr.length ? arr.reduce((s,v)=>s+(v||0),0)/arr.length : 0;
+                const lo = avg(idxs.map(i => cldLow[i]||0));
+                const mi = avg(idxs.map(i => (cldMid?.[i])||0));
+                const hi = avg(idxs.map(i => (cldHigh?.[i])||0));
+                return { low: lo, mid: mi, high: hi, total: Math.max(lo, mi*0.7, hi*0.5) };
+            });
+            for (let d = 0; d < 3; d++) {
+                const sr = sunrises[d], ss = sunsets[d];
+                if (!sr || !ss) continue;
+                const sunrise = parseDate(sr);
+                const sunset  = parseDate(ss);
+                const isToday = d === 0;
+                const now = isToday ? new Date() : new Date(sunrise.getFullYear(), sunrise.getMonth(), sunrise.getDate(), 0, 0, 0);
+                const code = weatherCodes[d] || weatherCodes[0];
+                const cloud = dailyAvgCloud[d];
+                renderPhotoDay(d, sunrise, sunset, now, isToday, code, cloud);
+            }
+        }
+
+        function renderPhotoDay(dayIdx, sunrise, sunset, now, isToday, weatherCode, cloudData) {
+            const srT = sunrise.getTime();
+            const ssT = sunset.getTime();
+            const windows = [
+                { name: '🔵 Reggeli kékóra',  start: new Date(srT - 40*60000), end: new Date(srT - 5*60000),  color: '#1e40af', light: '#93c5fd' },
+                { name: '🌅 Reggeli aranyóra', start: new Date(srT - 5*60000),  end: new Date(srT + 60*60000), color: '#92400e', light: '#fcd34d' },
+                { name: '🌇 Esti aranyóra',    start: new Date(ssT - 60*60000), end: new Date(ssT + 5*60000),  color: '#9a3412', light: '#fb923c' },
+                { name: '🔵 Esti kékóra',      start: new Date(ssT + 5*60000),  end: new Date(ssT + 40*60000), color: '#1e3a8a', light: '#60a5fa' },
+            ];
+            const container = document.getElementById('photo-windows-' + dayIdx);
+            if (!container) return;
+            container.innerHTML = windows.map(w => {
+                const startStr = fmt(w.start);
+                const endStr   = fmt(w.end);
+                const active   = isToday && now >= w.start && now <= w.end;
+                const past     = isToday && now > w.end;
+                const minutesLeft = Math.round((w.start - now) / 60000);
+                let badge = '';
+                if (active) badge = '<span style="font-size:9px;font-weight:800;color:#4ade80;background:rgba(74,222,128,0.15);padding:1px 6px;border-radius:4px">● MOST</span>';
+                else if (isToday && !past && minutesLeft > 0 && minutesLeft < 120) badge = `<span style="font-size:9px;color:rgba(255,255,255,0.65)">${minutesLeft} perc</span>`;
+                else if (past) badge = '<span style="font-size:9px;color:rgba(255,255,255,0.4)">volt</span>';
+                return `<div style="padding:0.4rem 0.6rem;border-radius:10px;background:rgba(255,255,255,0.11);border:1px solid ${active ? w.light + '44' : 'rgba(255,255,255,0.11)'};opacity:${past ? 0.4 : 1}">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+                        <p style="font-size:11px;font-weight:800;color:${w.light}">${w.name}</p>
+                        ${badge}
+                    </div>
+                    <p style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.95)">${startStr} – ${endStr}</p>
+                </div>`;
+            }).join('');
+            drawSunArc(sunrise, sunset, now, dayIdx);
+            updateLightQuality(weatherCode, cloudData, now, sunrise, sunset, dayIdx);
+        }
+
+        function drawSunArc(sunrise, sunset, now, dayIdx) {
+            const canvas = document.getElementById('sun-arc-' + (dayIdx !== undefined ? dayIdx : 0));
+            if (!canvas) return;
+            const dpr = window.devicePixelRatio || 1;
+            const W = canvas.offsetWidth || 340;
+            const H = 130;
+            canvas.width  = W * dpr;
+            canvas.height = H * dpr;
+            canvas.style.width  = W + 'px';
+            canvas.style.height = H + 'px';
+            const ctx = canvas.getContext('2d');
+            ctx.scale(dpr, dpr);
+
+            const cx = W / 2, cy = H - 18;
+            const rx = W / 2 - 20, ry = H - 35;
+
+            // Horizont vonal
+            ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+            ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(10, cy); ctx.lineTo(W - 10, cy); ctx.stroke();
+
+            // Napív háttér (szürke)
+            ctx.beginPath();
+            ctx.ellipse(cx, cy, rx, ry, 0, Math.PI, 0, true);
+            ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Napív haladás (gradient)
+            const dayStart = sunrise.getTime();
+            const dayEnd   = sunset.getTime();
+            const nowT     = Math.min(Math.max(now.getTime(), dayStart), dayEnd);
+            const progress = (nowT - dayStart) / (dayEnd - dayStart); // 0-1
+
+            const grad = ctx.createLinearGradient(cx - rx, 0, cx + rx, 0);
+            grad.addColorStop(0,    '#1e40af');
+            grad.addColorStop(0.15, '#f59e0b');
+            grad.addColorStop(0.5,  '#fbbf24');
+            grad.addColorStop(0.85, '#f97316');
+            grad.addColorStop(1,    '#1e3a8a');
+
+            // Haladás ív
+            const startAngle = Math.PI;
+            const endAngle   = Math.PI + progress * Math.PI;
+            ctx.beginPath();
+            ctx.ellipse(cx, cy, rx, ry, 0, startAngle, endAngle, false);
+            ctx.strokeStyle = grad;
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            // Fotós ablakok jelölése az ívben
+            const srT2 = sunrise.getTime(), ssT2 = sunset.getTime();
+            const photoZones = [
+                { s: new Date(srT2 - 40*60000), e: new Date(srT2 + 60*60000), color: 'rgba(251,191,36,0.3)' },
+                { s: new Date(ssT2 - 60*60000), e: new Date(ssT2 + 40*60000), color: 'rgba(249,115,22,0.3)' },
+            ];
+            photoZones.forEach(z => {
+                const ps = Math.max((z.s.getTime() - dayStart) / (dayEnd - dayStart), 0);
+                const pe = Math.min((z.e.getTime() - dayStart) / (dayEnd - dayStart), 1);
+                if (pe < 0 || ps > 1) return;
+                const aS = Math.PI + ps * Math.PI;
+                const aE = Math.PI + pe * Math.PI;
+                ctx.beginPath();
+                ctx.ellipse(cx, cy, rx, ry, 0, aS, aE, false);
+                ctx.strokeStyle = z.color;
+                ctx.lineWidth = 8;
+                ctx.stroke();
+            });
+
+            // Nap pozíció
+            const sunAngle = Math.PI + progress * Math.PI;
+            const sx = cx + rx * Math.cos(sunAngle);
+            const sy = cy + ry * Math.sin(sunAngle);
+            ctx.beginPath();
+            ctx.arc(sx, sy, 7, 0, Math.PI * 2);
+            ctx.fillStyle = now > sunset || now < sunrise ? '#60a5fa' : '#fbbf24';
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            // Feliratok
+            ctx.fillStyle = 'rgba(255,255,255,0.65)';
+            ctx.font = `${10}px Inter, sans-serif`;
+            ctx.textAlign = 'center';
+            const srStr = fmt(sunrise);
+            const ssStr = fmt(sunset);
+            ctx.fillText('↑ ' + srStr, 30, cy + 14);
+            ctx.fillText('↓ ' + ssStr, W - 30, cy + 14);
+        }
+
+        function updateLightQuality(code, cloudData, now, sunrise, sunset, dayIdx) {
+            const isToday = dayIdx === 0;
+            const isDay = now > sunrise && now < sunset;
+            const srT3 = sunrise.getTime(), ssT3 = sunset.getTime();
+            const isGolden = (now >= new Date(srT3 - 5*60000) && now <= new Date(srT3 + 60*60000)) ||
+                             (now >= new Date(ssT3 - 60*60000) && now <= new Date(ssT3 + 5*60000));
+            const isBlue   = (now >= new Date(srT3 - 40*60000) && now < new Date(srT3 - 5*60000)) ||
+                             (now > new Date(ssT3 + 5*60000)   && now <= new Date(ssT3 + 40*60000));
+
+            // Ha weather_code derültet mutat de a tényleges felhőzet magas → korrigálunk
+            let effectiveCode = code;
+            if (cloudData && code <= 2) {
+                const tot = cloudData.total;
+                if (tot >= 80) effectiveCode = 3;
+                else if (tot >= 50) effectiveCode = 2;
+                else if (tot >= 25) effectiveCode = 1;
+            }
+
+            let rating, ratingColor, desc;
+
+            if (isToday) {
+                // Ma: aktuális pillanat alapján
+                if (isGolden)      { rating = '⭐⭐⭐⭐⭐'; ratingColor = '#fcd34d'; desc = 'Aranyóra — ideális'; }
+                else if (isBlue)   { rating = '⭐⭐⭐⭐';  ratingColor = '#93c5fd'; desc = 'Kékóra — drámai fény'; }
+                else if (!isDay)   { rating = '⭐⭐';      ratingColor = '#64748b'; desc = 'Éjszaka'; }
+                else if (effectiveCode === 0) { rating = '⭐⭐';    ratingColor = '#fbbf24'; desc = 'Kemény napfény'; }
+                else if (effectiveCode <= 2)  { rating = '⭐⭐⭐⭐'; ratingColor = '#e2e8f0'; desc = 'Szórt fény — jó portré'; }
+                else if (effectiveCode === 3) { rating = '⭐⭐⭐';  ratingColor = '#94a3b8'; desc = 'Egyenletes fény'; }
+                else if (effectiveCode <= 49) { rating = '⭐⭐⭐';  ratingColor = '#7dd3fc'; desc = 'Ködös — hangulatos'; }
+                else                          { rating = '⭐';      ratingColor = '#64748b'; desc = 'Csapadék'; }
+            } else {
+                // Holnap/holnapután: aranyóra várható minősége az időjárás alapján
+                if (effectiveCode === 0)      { rating = '⭐⭐⭐⭐⭐'; ratingColor = '#fcd34d'; desc = 'Tiszta ég — remek aranyóra'; }
+                else if (effectiveCode <= 2)  { rating = '⭐⭐⭐⭐';  ratingColor = '#fb923c'; desc = 'Részleges felhő — szép égkép'; }
+                else if (effectiveCode === 3) { rating = '⭐⭐';      ratingColor = '#94a3b8'; desc = 'Borult — gyenge aranyóra'; }
+                else if (effectiveCode <= 49) { rating = '⭐⭐⭐';    ratingColor = '#7dd3fc'; desc = 'Ködös — hangulatos reggel'; }
+                else if (code <= 69) { rating = '⭐';        ratingColor = '#60a5fa'; desc = 'Eső várható'; }
+                else if (code <= 79) { rating = '⭐';        ratingColor = '#bae6fd'; desc = 'Havazás várható'; }
+                else                 { rating = '⭐';        ratingColor = '#64748b'; desc = 'Csapadék várható'; }
+            }
+
+            const items = isToday ? [
+                { icon: '🌤️', label: 'Értékelés', value: rating, color: ratingColor },
+                { icon: '💬', label: 'Jelleg', value: desc, color: 'rgba(255,255,255,0.8)' },
+                { icon: '🌅', label: 'Napkelte', value: fmt(sunrise), color: '#fcd34d' },
+                { icon: '🌇', label: 'Napnyugta', value: fmt(sunset), color: '#fb923c' },
+            ] : [
+                { icon: '📸', label: 'Aranyóra kilátás', value: rating, color: ratingColor },
+                { icon: '💬', label: 'Várható', value: desc, color: 'rgba(255,255,255,0.8)' },
+                { icon: '🌅', label: 'Napkelte', value: fmt(sunrise), color: '#fcd34d' },
+                { icon: '🌇', label: 'Napnyugta', value: fmt(sunset), color: '#fb923c' },
+            ];
+
+            const containerId = dayIdx !== undefined ? 'light-quality-' + dayIdx : 'light-quality-0';
+            const el = document.getElementById(containerId);
+            if (!el) return;
+            el.innerHTML = items.map(it =>
+                `<div style="padding:0.3rem 0.5rem;border-radius:8px;background:rgba(255,255,255,0.11);border:1px solid rgba(255,255,255,0.11)">
+                    <p style="font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:2px">${it.icon} ${it.label}</p>
+                    <p style="font-size:12px;font-weight:800;color:${it.color}">${it.value}</p>
+                </div>`
+            ).join('');
+        }
+        // ───────────────────────────────────────────────────
+
+        // ── KÖD & LÁTHATÓSÁG KÁRTYA ──────────────────────────
+        function updateFogCard(times, vis, dew, cldLow, cldMid, cldHigh, todayStr, sunrises, sunsets) {
+            // Segédfüggvények
+            const fogScore = (visKm, dewSpreadC, cldLowPct) => {
+                // Magasabb pontszám = nagyobb ködvalószínűség
+                let score = 0;
+                if (visKm < 0.2)       score += 4;
+                else if (visKm < 1)    score += 3;
+                else if (visKm < 5)    score += 2;
+                else if (visKm < 10)   score += 1;
+                if (dewSpreadC < 1)    score += 3;
+                else if (dewSpreadC < 3) score += 2;
+                else if (dewSpreadC < 6) score += 1;
+                if (cldLowPct > 80)    score += 2;
+                else if (cldLowPct > 50) score += 1;
+                return score;
+            };
+            const fogLabel = (score) => {
+                if (score >= 7) return { text: '🌫️ Sűrű köd', color: '#94a3b8' };
+                if (score >= 5) return { text: '🌁 Párás köd', color: '#7dd3fc' };
+                if (score >= 3) return { text: '💧 Enyhe pára', color: '#67e8f9' };
+                return { text: '✅ Tiszta', color: '#4ade80' };
+            };
+            const cloudDesc = (low, mid, high) => {
+                if (low > 60)  return { text: '☁️ Alacsony felhő', color: '#94a3b8', note: 'Lefogja az aranyórát' };
+                if (mid > 60)  return { text: '🌤 Közepes felhő', color: '#fbbf24', note: 'Szűrt, lágy fény' };
+                if (high > 60) return { text: '🌥 Magas cirrus', color: '#67e8f9', note: 'Pasztell égbolt' };
+                if (low < 20 && mid < 20 && high < 20) return { text: '☀️ Tiszta ég', color: '#4ade80', note: 'Kemény fény, alacsony napállásnál szép' };
+                return { text: '⛅ Vegyes felhőzet', color: '#fcd34d', note: 'Változatos fény' };
+            };
+            const visDesc = (km) => {
+                if (km < 0.2)  return { text: km < 0.05 ? '<50 m' : (km*1000).toFixed(0)+' m', color: '#94a3b8', note: 'Ködfotózás ideális!' };
+                if (km < 1)    return { text: km.toFixed(2)+' km', color: '#7dd3fc', note: 'Misztikus atmoszféra' };
+                if (km < 5)    return { text: km.toFixed(1)+' km', color: '#93c5fd', note: 'Pára, lágy kontúrok' };
+                if (km < 20)   return { text: km.toFixed(0)+' km', color: '#fcd34d', note: 'Normál láthatóság' };
+                return { text: km.toFixed(0)+' km', color: '#4ade80', note: 'Kiváló láthatóság' };
+            };
+
+            // 3 nap statisztikái (napkelte ±3h ablak - amikor köd legvalószínűbb)
+            const DAY_LABELS = ['Ma', 'Holnap', 'Holnapután'];
+            for (let d = 0; d < 3; d++) {
+                const dayDate = new Date(); dayDate.setDate(dayDate.getDate() + d);
+                const dStr = dayDate.toISOString().substring(0, 10);
+                // Napkelte körüli ablak: napkelte -1h .. +3h (ha van adat)
+                let srHour = 6; // default
+                if (sunrises && sunrises[d]) {
+                    const sr = parseDate(sunrises[d]);
+                    if (sr) srHour = sr.getHours();
+                }
+                // Indexek az ablakhoz
+                const windowIndices = times.reduce((acc, t, i) => {
+                    if (!t.startsWith(dStr)) return acc;
+                    const h = parseInt(t.substring(11, 13));
+                    if (h >= srHour - 1 && h <= srHour + 3) acc.push(i);
+                    return acc;
+                }, []);
+
+                // Átlagok a napkelte ablakban
+                const avg = (arr, idxs) => {
+                    const vals = idxs.map(i => arr[i]).filter(v => v != null && !isNaN(v));
+                    return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+                };
+                // Napközbeni (6-18) adatok felhőhöz
+                const dayIndices = times.reduce((acc, t, i) => {
+                    if (!t.startsWith(dStr)) return acc;
+                    const h = parseInt(t.substring(11, 13));
+                    if (h >= srHour && h <= srHour + 2) acc.push(i); // aranyóra körül
+                    return acc;
+                }, []);
+
+                const avgVis    = avg(vis, windowIndices.length ? windowIndices : dayIndices);
+                const avgDew    = avg(dew, windowIndices.length ? windowIndices : dayIndices);
+                // Hőmérséklet a harmatpont spreadhez - közelítés: ha nincs hőmérséklet, becsül
+                // A dewpoint spread-et a láthatóságból közelítjük
+                const avgCldLow  = avg(cldLow, dayIndices.length ? dayIndices : times.reduce((a,t,i)=>t.startsWith(dStr)?[...a,i]:a,[]));
+                const avgCldMid  = avg(cldMid,  dayIndices.length ? dayIndices : times.reduce((a,t,i)=>t.startsWith(dStr)?[...a,i]:a,[]));
+                const avgCldHigh = avg(cldHigh, dayIndices.length ? dayIndices : times.reduce((a,t,i)=>t.startsWith(dStr)?[...a,i]:a,[]));
+
+                const visKm = avgVis != null ? avgVis / 1000 : 20;
+                // dewpoint spread becslése: nincs hőmérséklet externből, de a harmatpont maga is hasznos info
+                const dewC  = avgDew != null ? avgDew : null;
+                // Köd score: láthatóság + alacsony felhő alapján
+                const spread = 2; // konzervatív default ha nincs temp
+                const score  = fogScore(visKm, spread, avgCldLow ?? 0);
+                const fLabel = fogLabel(score);
+                const cDesc  = cloudDesc(avgCldLow ?? 0, avgCldMid ?? 0, avgCldHigh ?? 0);
+                const vDesc  = visDesc(visKm);
+
+                const statEl = document.getElementById('fog-stats-' + d);
+                if (!statEl) continue;
+
+                const cell = (icon, label, val, sub, col) => `
+                    <div style="background:rgba(255,255,255,0.11);border-radius:8px;padding:0.3rem 0.5rem;border:1px solid rgba(255,255,255,0.11)">
+                        <div style="font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:2px">${icon} ${label}</div>
+                        <div style="font-size:12px;font-weight:700;color:${col};line-height:1.2">${val}</div>
+                        <div style="font-size:9px;color:#94a3b8;margin-top:1px">${sub}</div>
+                    </div>`;
+
+                statEl.innerHTML =
+                    cell('👁', 'Láthatóság', vDesc.text, vDesc.note, vDesc.color) +
+                    cell('🌫️', 'Reggeli pára', fLabel.text, `Felhő: ${(avgCldLow??0).toFixed(0)}% alacsony`, fLabel.color) +
+                    cell('💧', 'Harmatpont', dewC != null ? dewC.toFixed(1)+'°C' : '--', 'napkelte körül', '#7dd3fc') +
+                    cell('☁️', 'Felhőzet', cDesc.text, cDesc.note, cDesc.color);
+            }
+
+            // Láthatóság chart: mai 48h
+            drawFogChart(times, vis, todayStr);
+        }
+
+        function drawFogChart(times, vis, todayStr) {
+            const canvas = document.getElementById('fog-chart');
+            if (!canvas) return;
+            const dpr = window.devicePixelRatio || 1;
+            const W = canvas.offsetWidth || canvas.parentElement.offsetWidth || 300;
+            const H = 72;
+            canvas.width  = W * dpr;
+            canvas.height = H * dpr;
+            canvas.style.width  = W + 'px';
+            canvas.style.height = H + 'px';
+            const ctx = canvas.getContext('2d');
+            ctx.scale(dpr, dpr);
+
+            // 48h adat a mai naptól
+            const startIdx = times.findIndex(t => t.startsWith(todayStr));
+            if (startIdx < 0) return;
+            const slice = vis.slice(startIdx, startIdx + 48);
+            if (!slice.length) return;
+
+            const PAD_L = 36, PAD_R = 8, PAD_T = 6, PAD_B = 22;
+            const chartW = W - PAD_L - PAD_R;
+            const chartH = H - PAD_T - PAD_B;
+
+            // Skála: 0..25 km (felső határ)
+            const MAX_VIS = 25000; // méter
+            ctx.clearRect(0, 0, W, H);
+
+            // Háttér zónák
+            const zones = [
+                { max: 200,   color: 'rgba(148,163,184,0.15)' },  // sűrű köd
+                { max: 1000,  color: 'rgba(125,211,252,0.10)' },  // köd
+                { max: 5000,  color: 'rgba(147,197,253,0.07)' },  // pára
+            ];
+            zones.forEach(z => {
+                const y = PAD_T + chartH - (z.max / MAX_VIS) * chartH;
+                const h = (z.max / MAX_VIS) * chartH;
+                ctx.fillStyle = z.color;
+                ctx.fillRect(PAD_L, y, chartW, h);
+            });
+
+            // Grid vonal + label 10 km-nél
+            const gridVals = [1000, 5000, 10000];
+            gridVals.forEach(v => {
+                const y = PAD_T + chartH - (Math.min(v, MAX_VIS) / MAX_VIS) * chartH;
+                ctx.strokeStyle = 'rgba(255,255,255,0.11)';
+                ctx.lineWidth = 1;
+                ctx.beginPath(); ctx.moveTo(PAD_L, y); ctx.lineTo(W - PAD_R, y); ctx.stroke();
+                ctx.fillStyle = 'rgba(255,255,255,0.35)';
+                ctx.font = `${8 * dpr / dpr}px sans-serif`;
+                ctx.textAlign = 'right';
+                ctx.fillText(v >= 1000 ? (v/1000)+'km' : v+'m', PAD_L - 3, y + 3);
+            });
+
+            // Terület kitöltés
+            ctx.beginPath();
+            slice.forEach((v, i) => {
+                const x = PAD_L + (i / (slice.length - 1)) * chartW;
+                const y = PAD_T + chartH - (Math.min(v ?? MAX_VIS, MAX_VIS) / MAX_VIS) * chartH;
+                i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+            });
+            ctx.lineTo(PAD_L + chartW, PAD_T + chartH);
+            ctx.lineTo(PAD_L, PAD_T + chartH);
+            ctx.closePath();
+            const grad = ctx.createLinearGradient(0, PAD_T, 0, PAD_T + chartH);
+            grad.addColorStop(0, 'rgba(125,211,252,0.5)');
+            grad.addColorStop(1, 'rgba(125,211,252,0.05)');
+            ctx.fillStyle = grad;
+            ctx.fill();
+
+            // Vonal
+            ctx.beginPath();
+            slice.forEach((v, i) => {
+                const x = PAD_L + (i / (slice.length - 1)) * chartW;
+                const y = PAD_T + chartH - (Math.min(v ?? MAX_VIS, MAX_VIS) / MAX_VIS) * chartH;
+                i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+            });
+            ctx.strokeStyle = 'rgba(125,211,252,0.85)';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            // X tengely feliratok (6 óránként)
+            ctx.fillStyle = 'rgba(255,255,255,0.5)';
+            ctx.textAlign = 'center';
+            ctx.font = '8px sans-serif';
+            for (let i = 0; i < slice.length; i += 6) {
+                const t = times[startIdx + i];
+                if (!t) continue;
+                const h = t.substring(11, 16);
+                const x = PAD_L + (i / (slice.length - 1)) * chartW;
+                ctx.fillText(h, x, H - 5);
+            }
+        }
+
+        // ── ÉJSZAKAI / ASZTRO OLDAL ─────────────────────────
+
+        // Hold fázis számítás (közelítés, ~1 napos pontossággal)
+        function moonPhase(date) {
+            // Jean Meeus "Astronomical Algorithms" alapján
+            // Pontosság: ~néhány perc
+            const JD = date.getTime() / 86400000 + 2440587.5; // Julian Date
+            const T  = (JD - 2451545.0) / 36525.0;            // Julian évszázad J2000.0-tól
+
+            // Hold átlagos anomáliája
+            const M  = (357.5291092 + 35999.0502909 * T) * Math.PI / 180;
+            // Hold átlagos anomáliája (hold)
+            const Mprime = (134.9633964 + 477198.8675055 * T) * Math.PI / 180;
+            // Hold szélességi argumentuma
+            const F  = (93.2720950 + 483202.0175233 * T) * Math.PI / 180;
+            // Hold elongációja
+            const D  = (297.8501921 + 445267.1114034 * T) * Math.PI / 180;
+
+            // Szinodikus fázis (0..1): 0=újhold, 0.5=telihold
+            // Alap: átlagos elongáció
+            let phase = (D * 180 / Math.PI) % 360;
+            if (phase < 0) phase += 360;
+
+            // Korrekciók (főbb tagok)
+            phase += -1.2740 * Math.sin(Mprime)
+                   +  0.6583 * Math.sin(2 * D - Mprime)
+                   +  0.2136 * Math.sin(2 * Mprime)
+                   -  0.1773 * Math.sin(2 * D - M)
+                   -  0.1098 * Math.sin(2 * D)
+                   +  0.0713 * Math.sin(M)
+                   -  0.0527 * Math.sin(2 * D + Mprime)
+                   +  0.0422 * Math.sin(2 * D - 2 * Mprime)
+                   -  0.0021 * Math.sin(M - Mprime);
+
+            phase = ((phase % 360) + 360) % 360;
+
+            // 0..29.53059 skálára (cycle napokban)
+            return (phase / 360) * 29.53059;
+        }
+
+        function moonEmoji(cycle) {
+            const phase = cycle / 29.53059;
+            if (phase < 0.025 || phase >= 0.975) return { emoji: '🌑', name: 'Újhold' };
+            if (phase < 0.25)  return { emoji: '🌒', name: 'Növekvő sarló' };
+            if (phase < 0.275) return { emoji: '🌓', name: 'Első negyed' };
+            if (phase < 0.475) return { emoji: '🌔', name: 'Növekvő gibbusz' };
+            if (phase < 0.525) return { emoji: '🌕', name: 'Telihold' };
+            if (phase < 0.725) return { emoji: '🌖', name: 'Fogyó gibbusz' };
+            if (phase < 0.775) return { emoji: '🌗', name: 'Utolsó negyed' };
+            return { emoji: '🌘', name: 'Fogyó sarló' };
+        }
+
+        function moonIllumination(cycle) {
+            // közelítés: cos alapú
+            const angle = (cycle / 29.53059) * 2 * Math.PI;
+            return Math.round(((1 - Math.cos(angle)) / 2) * 100);
+        }
+
+        // Hold rajzolása canvas-ra
+        function drawMoon(canvasId, cycle) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+            const dpr = window.devicePixelRatio || 1;
+            const SIZE = 72;
+            canvas.width = canvas.height = SIZE * dpr;
+            canvas.style.width = canvas.style.height = SIZE + 'px';
+            const ctx = canvas.getContext('2d');
+            ctx.scale(dpr, dpr);
+            const cx = SIZE / 2, cy = SIZE / 2, r = SIZE / 2 - 4;
+            const phase = cycle / 29.53059; // 0..1
+
+            // Hold korong (sötét alap)
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, Math.PI * 2);
+            ctx.fillStyle = '#1e293b';
+            ctx.fill();
+
+            // Megvilágított rész
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, Math.PI * 2);
+            ctx.clip();
+
+            // Növekvő (0..0.5): jobb oldal megvilágított
+            // Fogyó (0.5..1): bal oldal megvilágított
+            const illum = (1 - Math.cos(phase * 2 * Math.PI)) / 2;
+            const waning = phase > 0.5;
+            const k = waning ? (1 - illum) * 2 - 1 : illum * 2 - 1; // -1..1 ahol 0 = félhold
+
+            ctx.beginPath();
+            if (!waning) {
+                // Növekvő: jobb félkör + bal ellipszis
+                ctx.arc(cx, cy, r, -Math.PI / 2, Math.PI / 2);
+                ctx.bezierCurveTo(cx + k * r, cy + r, cx + k * r, cy - r, cx, cy - r);
+            } else {
+                // Fogyó: bal félkör + jobb ellipszis
+                ctx.arc(cx, cy, r, Math.PI / 2, -Math.PI / 2);
+                ctx.bezierCurveTo(cx - k * r, cy - r, cx - k * r, cy + r, cx, cy + r);
+            }
+            ctx.closePath();
+            ctx.fillStyle = '#f1f5f9';
+            ctx.fill();
+            ctx.restore();
+
+            // Kör keret
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+
+        // Szürkületi idők számítása (napkelte/napnyugta alapján közelítés)
+        function twilightTimes(sunrise, sunset) {
+            const srT = sunrise.getTime();
+            const ssT = sunset.getTime();
+            return {
+                astroStart:  new Date(srT - 90 * 60000), // csillagászati szürkület kezdete
+                nautStart:   new Date(srT - 60 * 60000), // nautikai
+                civilStart:  new Date(srT - 30 * 60000), // civil
+                sunrise:     sunrise,
+                sunset:      sunset,
+                civilEnd:    new Date(ssT + 30 * 60000),
+                nautEnd:     new Date(ssT + 60 * 60000),
+                astroEnd:    new Date(ssT + 90 * 60000),
+                darkStart:   new Date(ssT + 90 * 60000),
+                darkEnd:     new Date(srT - 90 * 60000 + 86400000),
+            };
+        }
+
+        function drawTwilightBar(canvasId, tw, now) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+            const dpr = window.devicePixelRatio || 1;
+            const W = canvas.offsetWidth || canvas.parentElement.offsetWidth || 300;
+            const H = 36;
+            canvas.width  = W * dpr;
+            canvas.height = H * dpr;
+            canvas.style.width  = W + 'px';
+            canvas.style.height = H + 'px';
+            const ctx = canvas.getContext('2d');
+            ctx.scale(dpr, dpr);
+
+            // Időszakasz: éjfél -12h..+12h (24 óra)
+            const midday = new Date(tw.sunrise);
+            midday.setHours(12, 0, 0, 0);
+            const dayStart = new Date(midday.getTime() - 12 * 3600000);
+            const dayEnd   = new Date(midday.getTime() + 12 * 3600000);
+            const span = dayEnd.getTime() - dayStart.getTime();
+
+            const toX = t => ((t - dayStart.getTime()) / span) * W;
+
+            const PAD = 14; // alap label sor
+
+            // Szegmensek
+            const segs = [
+                { from: dayStart,       to: tw.astroStart,  color: '#0f172a' },
+                { from: tw.astroStart,  to: tw.nautStart,   color: '#1e3a5f' },
+                { from: tw.nautStart,   to: tw.civilStart,  color: '#1e4d8c' },
+                { from: tw.civilStart,  to: tw.sunrise,     color: '#f97316' },
+                { from: tw.sunrise,     to: tw.sunset,      color: '#fbbf24' },
+                { from: tw.sunset,      to: tw.civilEnd,    color: '#f97316' },
+                { from: tw.civilEnd,    to: tw.nautEnd,     color: '#1e4d8c' },
+                { from: tw.nautEnd,     to: tw.astroEnd,    color: '#1e3a5f' },
+                { from: tw.astroEnd,    to: dayEnd,         color: '#0f172a' },
+            ];
+
+            segs.forEach(s => {
+                const x1 = Math.max(0, toX(s.from));
+                const x2 = Math.min(W, toX(s.to));
+                if (x2 <= x1) return;
+                ctx.fillStyle = s.color;
+                ctx.fillRect(x1, 0, x2 - x1, H - PAD);
+            });
+
+            // Idő jelölők
+            const markers = [tw.astroStart, tw.civilStart, tw.sunrise, tw.sunset, tw.civilEnd, tw.astroEnd];
+            markers.forEach(t => {
+                const x = toX(t);
+                if (x < 0 || x > W) return;
+                ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+                ctx.lineWidth = 1;
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H - PAD); ctx.stroke();
+                ctx.fillStyle = 'rgba(255,255,255,0.45)';
+                ctx.font = '7px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(fmt(t), x, H - 5);
+            });
+
+            // Most vonal
+            const nowX = toX(now);
+            if (nowX >= 0 && nowX <= W) {
+                ctx.strokeStyle = '#f87171';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath(); ctx.moveTo(nowX, 0); ctx.lineTo(nowX, H - PAD); ctx.stroke();
+            }
+        }
+
+        function updateNightPage(sunrises, sunsets, currentTimeStr) {
+            if (!sunrises.length || !sunsets.length) return;
+            const now = new Date();
+            const sunrise = parseDate(sunrises[0]);
+            const sunset  = parseDate(sunsets[0]);
+            if (!sunrise || !sunset) return;
+
+            // Hold
+            const cycle = moonPhase(now);
+            const { emoji, name } = moonEmoji(cycle);
+            const illum = moonIllumination(cycle);
+
+            document.getElementById('moon-phase-label').innerText = emoji + ' ' + name;
+            drawMoon('moon-canvas', cycle);
+
+            // Napok következő főfázisig
+            const daysToFull = cycle < 14.76 ? (14.76 - cycle) : (29.53 - cycle + 14.76);
+            const daysToNew  = cycle < 29.53 ? (29.53 - cycle) : 0;
+
+            const cell = (icon, label, val, col) => `
+                <div style="padding:0.3rem 0.5rem;border-radius:8px;background:rgba(255,255,255,0.11);border:1px solid rgba(255,255,255,0.11)">
+                    <p style="font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:2px">${icon} ${label}</p>
+                    <p style="font-size:12px;font-weight:800;color:${col}">${val}</p>
+                </div>`;
+
+            document.getElementById('moon-stats').innerHTML =
+                cell('💡', 'Megvilágítás', illum + '%', illum > 70 ? '#fcd34d' : illum > 30 ? '#94a3b8' : '#334155') +
+                cell('🌕', 'Teliholdig', Math.round(daysToFull) + ' nap', '#fcd34d') +
+                cell('🌑', 'Újholdig', Math.round(daysToNew) + ' nap', '#64748b') +
+                cell('📸', 'Fotós érték', illum < 15 ? '⭐⭐⭐⭐⭐ Sötét ég' : illum < 40 ? '⭐⭐⭐⭐ Jó' : illum < 70 ? '⭐⭐⭐ Közepes' : illum < 90 ? '⭐⭐ Fényes hold' : '⭐ Telihold — Mo fényszennyezés', illum < 40 ? '#4ade80' : illum < 70 ? '#fcd34d' : '#f87171');
+
+            // 7 napos hold csík
+            const weekEl = document.getElementById('moon-week');
+            let weekHtml = '';
+            for (let d = 0; d < 7; d++) {
+                const dd = new Date(now.getTime() + d * 86400000);
+                const dc = moonPhase(dd);
+                const { emoji: de } = moonEmoji(dc);
+                const di = moonIllumination(dc);
+                const dayName = d === 0 ? 'Ma' : d === 1 ? 'H' : ['K','Sze','Cs','P','Szo','V'][(dd.getDay() + 6) % 7 - 1] || fmtDay(dd).substring(0,2);
+                weekHtml += `<div style="text-align:center;flex:1">
+                    <div style="font-size:16px">${de}</div>
+                    <div style="font-size:8px;color:#94a3b8;margin-top:1px">${di}%</div>
+                    <div style="font-size:8px;color:#8b9ab0">${dayName}</div>
+                </div>`;
+            }
+            weekEl.innerHTML = weekHtml;
+
+            // Szürkület
+            const tw = twilightTimes(sunrise, sunset);
+            drawTwilightBar('twilight-canvas', tw, now);
+
+            // Szürkület új elrendezés: reggeli 3 col | nap | esti 3 col | éjjel
+            const twilightStats = document.getElementById('twilight-stats');
+
+            const twCell = (icon, label, start, end, color, active, past, minsLeft) => {
+                let badge = '';
+                if (active)                              badge = '<span style="font-size:8px;font-weight:800;color:#4ade80;background:rgba(74,222,128,0.15);padding:1px 5px;border-radius:4px">● MOST</span>';
+                else if (!past && minsLeft > 0 && minsLeft < 120) badge = `<span style="font-size:8px;color:rgba(255,255,255,0.6)">${minsLeft}p</span>`;
+                else if (past)                           badge = '<span style="font-size:8px;color:rgba(255,255,255,0.3)">volt</span>';
+                return `<div style="padding:0.3rem 0.4rem;border-radius:8px;background:rgba(255,255,255,0.11);border:1px solid ${active ? color+'55' : 'rgba(255,255,255,0.11)'};opacity:${past ? 0.4 : 1};min-width:0">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1px;gap:2px">
+                        <span style="font-size:9px;font-weight:700;color:${color};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${icon} ${label}</span>
+                        ${badge}
+                    </div>
+                    <div style="font-size:11px;font-weight:800;color:rgba(255,255,255,0.9)">${fmt(start)}</div>
+                    <div style="font-size:9px;color:#8b9ab0">– ${fmt(end)}</div>
+                </div>`;
+            };
+
+            const twBigCell = (icon, label, start, end, color, active, past, minsLeft) => {
+                let badge = '';
+                if (active)                              badge = '<span style="font-size:9px;font-weight:800;color:#4ade80;background:rgba(74,222,128,0.15);padding:1px 6px;border-radius:4px">● MOST</span>';
+                else if (!past && minsLeft > 0 && minsLeft < 120) badge = `<span style="font-size:9px;color:rgba(255,255,255,0.6)">${minsLeft} perc</span>`;
+                else if (past)                           badge = '<span style="font-size:9px;color:rgba(255,255,255,0.3)">volt</span>';
+                return `<div style="padding:0.35rem 0.5rem;border-radius:8px;background:rgba(255,255,255,0.08);border:1px solid ${active ? color+'55' : 'rgba(255,255,255,0.08)'};opacity:${past ? 0.4 : 1}">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
+                        <span style="font-size:10px;font-weight:800;color:${color}">${icon} ${label}</span>
+                        ${badge}
+                    </div>
+                    <div style="font-size:12px;font-weight:800;color:rgba(255,255,255,0.9)">${fmt(start)} – ${fmt(end)}</div>
+                </div>`;
+            };
+
+            const isAct  = (s, e) => now >= s && now <= e;
+            const isPast = (e)    => now > e;
+            const mins   = (s)    => Math.round((s.getTime() - now.getTime()) / 60000);
+
+            // Reggeli szürkület (3 oszlop)
+            const morningRow = `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.3rem;margin-bottom:0.3rem">
+                ${twCell('🌌','Csillagász.',tw.astroStart,tw.nautStart,'#7dd3fc', isAct(tw.astroStart,tw.nautStart), isPast(tw.nautStart), mins(tw.astroStart))}
+                ${twCell('⚓','Nautikai',   tw.nautStart, tw.civilStart,'#93c5fd', isAct(tw.nautStart,tw.civilStart),isPast(tw.civilStart),mins(tw.nautStart))}
+                ${twCell('🏙️','Civil',     tw.civilStart,tw.sunrise,   '#fb923c', isAct(tw.civilStart,tw.sunrise),  isPast(tw.sunrise),   mins(tw.civilStart))}
+            </div>`;
+
+            // Nap (teljes szélesség)
+            const sunRow = `<div style="margin-bottom:0.3rem">
+                ${twBigCell('☀️','Nap', tw.sunrise, tw.sunset, '#fcd34d', isAct(tw.sunrise,tw.sunset), isPast(tw.sunset), mins(tw.sunrise))}
+            </div>`;
+
+            // Esti szürkület (3 oszlop)
+            const eveningRow = `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.3rem;margin-bottom:0.3rem">
+                ${twCell('🏙️','Civil',     tw.sunset,   tw.civilEnd, '#fb923c', isAct(tw.sunset,tw.civilEnd),  isPast(tw.civilEnd),  mins(tw.sunset))}
+                ${twCell('⚓','Nautikai',   tw.civilEnd, tw.nautEnd,  '#93c5fd', isAct(tw.civilEnd,tw.nautEnd), isPast(tw.nautEnd),   mins(tw.civilEnd))}
+                ${twCell('🌌','Csillagász.',tw.nautEnd,  tw.astroEnd, '#7dd3fc', isAct(tw.nautEnd,tw.astroEnd), isPast(tw.astroEnd),  mins(tw.nautEnd))}
+            </div>`;
+
+            // Éjjel (teljes szélesség) — darkStartTonight/darkEndThisMorning előre kell
+            const darkEndMorning = new Date(sunrise.getTime() - 90 * 60000);
+            const darkStartEve   = new Date(sunset.getTime()  + 90 * 60000);
+
+            // Sötét ablak hossza
+            const darkEndTomorrow  = new Date(sunrise.getTime() + 86400000 - 90 * 60000);
+            const darkMinutes = Math.round((darkEndTomorrow.getTime() - darkStartEve.getTime()) / 60000);
+            const darkHours = Math.floor(darkMinutes / 60);
+            const darkMins  = darkMinutes % 60;
+
+            const nightActive    = now < darkEndMorning || now >= darkStartEve;
+            const nightPast      = now >= darkEndMorning && now < darkStartEve;
+            const nightMins      = mins(darkStartEve);
+            let nightBadge = '';
+            if (nightActive) {
+                const rm = now < darkEndMorning
+                    ? Math.round((darkEndMorning.getTime() - now.getTime()) / 60000)
+                    : null;
+                nightBadge = rm !== null && rm < 120
+                    ? `<span style="font-size:9px;font-weight:800;color:#4ade80;background:rgba(74,222,128,0.15);padding:1px 6px;border-radius:4px">● még ${rm} perc</span>`
+                    : '<span style="font-size:9px;font-weight:800;color:#4ade80;background:rgba(74,222,128,0.15);padding:1px 6px;border-radius:4px">● MOST</span>';
+            } else if (!nightPast && nightMins > 0 && nightMins < 120) {
+                nightBadge = `<span style="font-size:9px;color:rgba(255,255,255,0.6)">${nightMins} perc</span>`;
+            } else if (nightPast) {
+                nightBadge = '<span style="font-size:9px;color:rgba(255,255,255,0.3)">este folytatódik</span>';
+            }
+            const nightRow = `<div>
+                <div style="padding:0.35rem 0.5rem;border-radius:8px;background:rgba(255,255,255,0.08);border:1px solid ${nightActive ? '#334155aa' : 'rgba(255,255,255,0.08)'};opacity:${nightPast ? 0.5 : 1}">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
+                        <span style="font-size:10px;font-weight:800;color:#94a3b8">🌑 Csillagászati sötétség</span>
+                        ${nightBadge}
+                    </div>
+                    <div style="display:flex;justify-content:space-between;align-items:baseline">
+                        <div style="font-size:12px;font-weight:800;color:rgba(255,255,255,0.9)">${fmt(darkStartEve)} – ${fmt(darkEndMorning)} <span style="font-size:9px;font-weight:400;color:#8b9ab0">(másnap)</span></div>
+                        <div style="font-size:10px;font-weight:700;color:#8b9ab0">⏱ ${darkHours}ó ${darkMins}p</div>
+                    </div>
+                </div>
+            </div>`;
+
+            twilightStats.innerHTML = morningRow + sunRow + eveningRow + nightRow;
+
+        }
+
+        // ── CSAPADÉK GRAFIKON ───────────────────────────────
+        function drawPrecipChart(hourlyTimes, hourlyPrecip, hourlyProb, todayStr) {
+            const canvas = document.getElementById('precip-chart');
+            if (!canvas) return;
+            const dpr = window.devicePixelRatio || 1;
+            const W = canvas.offsetWidth || 320;
+            const H = 120;
+            canvas.width  = W * dpr;
+            canvas.height = H * dpr;
+            canvas.style.width  = W + 'px';
+            canvas.style.height = H + 'px';
+            const ctx = canvas.getContext('2d');
+            ctx.scale(dpr, dpr);
+
+            // Következő 48 óra az aktuális időtől
+            const now = new Date();
+            const currentHour = now.getHours();
+            const startKey = `${todayStr}T${String(currentHour).padStart(2,'0')}:00`;
+            const startIdx = hourlyTimes.indexOf(startKey);
+            if (startIdx === -1) return;
+
+            const hours = 48;
+            const times  = hourlyTimes.slice(startIdx, startIdx + hours);
+            const precip = hourlyPrecip.slice(startIdx, startIdx + hours);
+            const prob   = hourlyProb.slice(startIdx, startIdx + hours);
+
+            const padL = 28, padR = 8, padT = 10, padB = 24;
+            const gW = W - padL - padR;
+            const gH = H - padT - padB;
+
+            const maxPrecip = Math.max(...precip, 0.5);
+            const maxProb   = 100;
+
+            // Grid vízszintes vonalak
+            ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+            ctx.lineWidth = 1;
+            [0, 25, 50, 75, 100].forEach(p => {
+                const y = padT + gH - (p / maxProb) * gH;
+                ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + gW, y); ctx.stroke();
+            });
+
+            // Valószínűség vonal (%)
+            ctx.beginPath();
+            ctx.strokeStyle = 'rgba(125,211,252,0.6)';
+            ctx.lineWidth = 1.5;
+            prob.forEach((p, i) => {
+                const x = padL + (i / (hours - 1)) * gW;
+                const y = padT + gH - (p / maxProb) * gH;
+                i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+
+            // Csapadék mennyiség oszlopok (mm)
+            const barW = Math.max(gW / hours - 1, 2);
+            precip.forEach((mm, i) => {
+                if (mm <= 0) return;
+                const x = padL + (i / hours) * gW;
+                const barH = Math.min((mm / maxPrecip) * gH, gH);
+                const y = padT + gH - barH;
+                const alpha = Math.min(0.3 + (mm / maxPrecip) * 0.7, 1);
+                ctx.fillStyle = `rgba(56,189,248,${alpha})`;
+                ctx.fillRect(x, y, barW, barH);
+            });
+
+            // X tengely időcímkék (6 óránként)
+            ctx.fillStyle = 'rgba(255,255,255,0.65)';
+            ctx.font = `${9 * dpr / dpr}px Inter, sans-serif`;
+            ctx.textAlign = 'center';
+            times.forEach((t, i) => {
+                if (i % 6 !== 0) return;
+                const x = padL + (i / (hours - 1)) * gW;
+                const hh = t.substring(11, 16);
+                ctx.fillText(hh, x, H - 6);
+            });
+
+            // Y tengely (bal, %)
+            ctx.textAlign = 'right';
+            ctx.fillStyle = 'rgba(125,211,252,0.5)';
+            ['0', '50', '100'].forEach(p => {
+                const y = padT + gH - (parseInt(p) / maxProb) * gH + 3;
+                ctx.fillText(p + '%', padL - 3, y);
+            });
+        }
+        // ───────────────────────────────────────────────────
+
+        // ───────────────────────────────────────────────────
+
+        window.onload = () => {
+            const vl = document.getElementById('app-version-label');
+            if (vl) vl.textContent = 'Béta · ' + APP_VERSION;
+        (function() {
+            let currentPage = 0;
+            window._currentPage = 0;
+            let startX = 0, startY = 0, isDragging = false;
+            const inner = document.getElementById('swipe-inner');
+            const container = document.getElementById('swipe-container');
+
+            function goTo(page) {
+                currentPage = Math.max(0, Math.min(4, page));
+                window._currentPage = currentPage;
+                inner.style.transform = 'translateX(-' + (currentPage * 100) + '%)';
+                [0,1,2,3,4].forEach(i => {
+                    const d = document.getElementById('dot-' + i);
+                    if (d) {
+                        d.style.background = currentPage === i ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.25)';
+                        d.style.width = currentPage === i ? '18px' : '6px';
+                    }
+                });
+                document.getElementById('nav-prev').style.color = currentPage === 0 ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.7)';
+                document.getElementById('nav-next').style.color = currentPage === 4 ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.7)';
+                if (currentPage === 4) {
+                    if (!window._allVizAttrs) {
+                        fetchVizallas();
+                    } else {
+                        // Újraszámolja a közel listát az aktuális koordinátákkal
+                        window.computeVizKozel(window._vizFeatures);
+                        window.renderVizTab?.();
+                    }
+                }
+            }
+
+            // SWIPE LOGIKA:
+            // A fő lapozó mindig az egész swipe-container-en figyel.
+            // A fotós belső lapozó a napív kártyán belül stopPropagation-nal elnyeli
+            // a touch eseményt, ha a touch a középső 50%-ban indul.
+            // A szélső 25%-25% mindig a fő lapozóé — ott a belső handler nem indul el.
+            const EDGE_PX = () => container.offsetWidth * 0.25;
+            const radarOverlay = document.getElementById('radar-overlay');
+            const showOverlay = () => { if (radarOverlay) radarOverlay.style.display = 'block'; };
+            const hideOverlay = () => { if (radarOverlay) radarOverlay.style.display = 'none'; };
+
+            container.addEventListener('touchstart', e => {
+                if (e.touches.length > 1) { isDragging = false; return; }
+                startX = e.touches[0].clientX;
+                startY = e.touches[0].clientY;
+                isDragging = null;
+                inner.style.transition = 'none';
+                showOverlay();
+            }, { passive: true });
+
+            container.addEventListener('touchmove', e => {
+                if (e.touches.length > 1) { isDragging = false; return; }
+                if (isDragging === false) return;
+                const dx = e.touches[0].clientX - startX;
+                const dy = e.touches[0].clientY - startY;
+                if (isDragging === null) {
+                    if (Math.abs(dy) > Math.abs(dx)) { isDragging = false; hideOverlay(); return; }
+                    if (Math.abs(dx) > 5) isDragging = true;
+                    else return;
+                }
+                e.preventDefault();
+                const base = currentPage * container.offsetWidth;
+                inner.style.transform = 'translateX(' + (-base + dx) + 'px)';
+            }, { passive: false });
+
+            container.addEventListener('touchend', e => {
+                hideOverlay();
+                if (!isDragging) { isDragging = false; return; }
+                isDragging = false;
+                inner.style.transition = 'transform 0.35s cubic-bezier(0.4,0,0.2,1)';
+                const dx = e.changedTouches[0].clientX - startX;
+                if (dx < -50) goTo(currentPage + 1);
+                else if (dx > 50) goTo(currentPage - 1);
+                else goTo(currentPage);
+            });
+
+            container.addEventListener('touchcancel', () => { isDragging = false; hideOverlay(); goTo(currentPage); });
+
+            // Mouse (asztali böngésző)
+            container.addEventListener('mousedown', e => {
+                startX = e.clientX; startY = e.clientY;
+                isDragging = true;
+                inner.style.transition = 'none';
+                container.style.cursor = 'grabbing';
+            });
+            container.addEventListener('mousemove', e => {
+                if (!isDragging) return;
+                const dx = e.clientX - startX;
+                const base = currentPage * container.offsetWidth;
+                inner.style.transform = 'translateX(' + (-base + dx) + 'px)';
+            });
+            container.addEventListener('mouseup', e => {
+                if (!isDragging) return;
+                isDragging = false;
+                inner.style.transition = 'transform 0.35s cubic-bezier(0.4,0,0.2,1)';
+                container.style.cursor = 'grab';
+                const dx = e.clientX - startX;
+                if (dx < -50) goTo(currentPage + 1);
+                else if (dx > 50) goTo(currentPage - 1);
+                else goTo(currentPage);
+            });
+            container.addEventListener('mouseleave', e => {
+                if (!isDragging) return;
+                isDragging = false;
+                inner.style.transition = 'transform 0.35s cubic-bezier(0.4,0,0.2,1)';
+                container.style.cursor = 'grab';
+                goTo(currentPage);
+            });
+
+            container.style.cursor = 'grab';
+            window.goToPage = goTo;
+        })();
+
+            // Fotós belső swipe — csak a napív kártyán, csak középső 50%-ban
+            (function() {
+                const el = document.getElementById('photo-inner');
+                if (!el) return;
+                const card = document.getElementById('photo-arc-card');
+                if (!card) return;
+                let sx = 0, sy = 0, dragging = null;
+
+                card.addEventListener('touchstart', e => {
+                    if (e.touches.length > 1) { dragging = false; return; }
+                    const tx = e.touches[0].clientX;
+                    const edge = window.innerWidth * 0.25;
+                    // Szélső 25% → fő lapozóé, ne nyeljük el
+                    if (tx < edge || tx > window.innerWidth - edge) { dragging = false; return; }
+                    // Középső zóna: elnyeljük a touch-ot
+                    e.stopPropagation();
+                    sx = tx; sy = e.touches[0].clientY; dragging = null;
+                }, { passive: true });
+
+                card.addEventListener('touchmove', e => {
+                    if (dragging === false) return;
+                    const dx = e.touches[0].clientX - sx;
+                    const dy = e.touches[0].clientY - sy;
+                    if (dragging === null) {
+                        if (Math.abs(dy) > Math.abs(dx)) { dragging = false; return; }
+                        if (Math.abs(dx) > 5) dragging = true; else return;
+                    }
+                    e.preventDefault();
+                    e.stopPropagation();
+                }, { passive: false });
+
+                card.addEventListener('touchend', e => {
+                    if (!dragging) { dragging = false; return; }
+                    dragging = false;
+                    const dx = e.changedTouches[0].clientX - sx;
+                    if (Math.abs(dx) > 40) {
+                        const dir = dx < 0 ? 1 : -1;
+                        const atBoundary = (dir === -1 && photoCurrentDay === 0) ||
+                                           (dir ===  1 && photoCurrentDay === 2);
+                        if (atBoundary) {
+                            // Határon van → fő lapozó veszi át
+                            window.goToPage(window._currentPage + dir);
+                        } else {
+                            photoStep(dir);
+                        }
+                    }
+                });
+
+                card.addEventListener('mousedown',  e => { sx = e.clientX; sy = e.clientY; dragging = null; });
+                card.addEventListener('mouseup',    e => {
+                    if (!dragging) { dragging = false; return; }
+                    dragging = false;
+                    const dx = e.clientX - sx;
+                    if (Math.abs(dx) > 40) photoStep(dx < 0 ? 1 : -1);
+                });
+                card.addEventListener('mouseleave', e => { if (dragging) { dragging = false; const dx = e.clientX - sx; if (Math.abs(dx) > 40) photoStep(dx < 0 ? 1 : -1); } });
+            })();
+
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    pos => {
+                        window._userLat = pos.coords.latitude;
+                        window._userLon = pos.coords.longitude;
+                        fetchWeatherByCoords(pos.coords.latitude, pos.coords.longitude);
+                        // Ha vízállás adat már betöltött, frissítjük a közel listát
+                        if (window._vizFeatures) {
+                            computeVizKozel(window._vizFeatures);
+                            if (window._currentPage === 4 && vizActiveTab === 'kozel') renderVizTab();
+                        }
+                    },
+                    ()  => fetchWeather('Vác')
+                );
+            } else {
+                fetchWeather('Vác');
+            }
+
+            // ── VÍZÁLLÁS ────────────────────────────────────
+            // ⚠ Állítsd be az alkönyvtáradnak megfelelően:
+           const VIZUGY_PROXY = 'https://metcards-vizugy.horlikz.workers.dev';
+
+            const FOKOZAT = {
+                720: { label: 'Normal', color: '#4ade80' },
+                721: { label: 'I. fok', color: '#facc15' },
+                722: { label: 'II. fok', color: '#fb923c' },
+                723: { label: 'III. fok', color: '#f87171' },
+                724: { label: 'Rendkívüli', color: '#c084fc' },
+            };
+
+            function vizallasCard(a) {
+                const nev   = a['vop.dbo.tAllomasFe.AllomasNev'] || '—';
+                const foly  = a['vop.dbo.tAllomasFe.VizfolyasNev'] || '';
+                const va    = a['vop.dbo.tAllomasFe.Vizallas'];
+                const hozam = a['vop.dbo.tAllomasFe.Vizhozam'];
+                const vizhof= a['vop.dbo.tAllomasFe.Vizho'];
+                const kf1   = a['vop.dbo.tAllomasFe.KF1'];
+                const kf2   = a['vop.dbo.tAllomasFe.KF2'];
+                const kf3   = a['vop.dbo.tAllomasFe.KF3'];
+                const fkod  = a['vop.dbo.tAllomasFe.FokozatKod'];
+                const fok   = FOKOZAT[fkod] || FOKOZAT[720];
+
+                // Vízállás sáv (0..max vizuálisan)
+                const max = kf3 > 0 ? kf3 * 1.15 : 800;
+                const pct = va != null ? Math.max(0, Math.min(100, (va / max) * 100)) : 0;
+                const barColor = va >= kf3 ? '#f87171' : va >= kf2 ? '#fb923c' : va >= kf1 ? '#facc15' : '#38bdf8';
+
+                // KF vonalak pozíciói
+                const kf1pct = kf1 > 0 ? Math.min(100, (kf1 / max) * 100) : null;
+                const kf2pct = kf2 > 0 ? Math.min(100, (kf2 / max) * 100) : null;
+                const kf3pct = kf3 > 0 ? Math.min(100, (kf3 / max) * 100) : null;
+
+                const kfLines = [kf1pct, kf2pct, kf3pct].filter(Boolean).map(p =>
+                    `<div style="position:absolute;left:${p}%;top:0;bottom:0;width:1px;background:rgba(255,255,255,0.25)"></div>`
+                ).join('');
+
+                return `<div style="background:rgba(255,255,255,0.11);border-radius:10px;padding:0.5rem 0.6rem;border:1px solid rgba(255,255,255,0.11)">
+                    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:0.3rem">
+                        <div>
+                            <span style="font-size:12px;font-weight:800;color:#e2e8f0">${nev}</span>
+                            <span style="font-size:9px;color:#8b9ab0;margin-left:4px">${foly}</span>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:6px">
+                            ${vizhof != null ? `<span style="font-size:10px;color:#7dd3fc">💧${vizhof.toFixed(1)}°C</span>` : ''}
+                            <span style="font-size:9px;font-weight:700;color:${fok.color};background:${fok.color}22;padding:1px 5px;border-radius:4px">${fok.label}</span>
+                        </div>
+                    </div>
+                    <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:0.35rem">
+                        <span style="font-size:20px;font-weight:900;color:${barColor}">${va != null ? va : '—'}</span>
+                        <span style="font-size:10px;color:#8b9ab0">cm</span>
+                        ${hozam != null ? `<span style="font-size:10px;color:#94a3b8;margin-left:4px">${hozam >= 1000 ? (hozam/1000).toFixed(2)+'k' : hozam.toFixed(1)} m³/s</span>` : ''}
+                    </div>
+                    <div style="position:relative;height:6px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden">
+                        ${kfLines}
+                        <div style="position:absolute;left:0;top:0;bottom:0;width:${pct}%;background:${barColor};border-radius:3px;transition:width 0.5s"></div>
+                    </div>
+                    ${kf1 > 0 ? `<div style="display:flex;gap:8px;margin-top:3px">
+                        <span style="font-size:8px;color:#8b9ab0">I.fok: ${kf1}</span>
+                        <span style="font-size:8px;color:#8b9ab0">II.: ${kf2}</span>
+                        <span style="font-size:8px;color:#8b9ab0">III.: ${kf3}</span>
+                    </div>` : ''}
+                </div>`;
+            }
+
+            const VIZ_TABS = {};
+            let vizActiveTab = 'kozel';
+
+            function setVizTab(tab) {
+                vizActiveTab = tab;
+                ['kozel','kereses'].forEach(t => {
+                    const b = document.getElementById('vtab-' + t);
+                    if (!b) return;
+                    const active = t === tab;
+                    b.style.background = active ? 'rgba(255,255,255,0.9)' : 'transparent';
+                    b.style.color = active ? '#0f172a' : 'rgba(255,255,255,0.5)';
+                    b.style.border = active ? 'none' : '1px solid rgba(255,255,255,0.15)';
+                });
+                const searchRow = document.getElementById('vizallas-search-row');
+                if (searchRow) searchRow.style.display = tab === 'kereses' ? 'block' : 'none';
+                if (tab === 'kereses') {
+                    setTimeout(() => document.getElementById('vizallas-search-input')?.focus(), 50);
+                    vizallasSearch(document.getElementById('vizallas-search-input')?.value || '');
+                } else {
+                    renderVizTab();
+                }
+            }
+
+            function renderVizTab() {
+                const el = document.getElementById('vizallas-list');
+                if (!el || !window._allVizAttrs) return;
+                let attrs = [];
+                if (vizActiveTab === 'kozel') {
+                    attrs = window._vizKozel || [];
+                } else if (VIZ_TABS[vizActiveTab]) {
+                    attrs = VIZ_TABS[vizActiveTab]
+                        .map(nev => window._allVizAttrs.find(a => a['vop.dbo.tAllomasFe.AllomasNev'] === nev))
+                        .filter(Boolean);
+                }
+                el.innerHTML = attrs.length
+                    ? attrs.map(vizallasCard).join('')
+                    : '<div style="font-size:11px;color:#8b9ab0;text-align:center;padding:0.5rem">Nincs adat</div>';
+            }
+
+            function vizallasSearch(q) {
+                const el = document.getElementById('vizallas-list');
+                if (!el || !window._allVizAttrs) return;
+                const term = q.trim().toLowerCase();
+                if (!term) { el.innerHTML = '<div style="font-size:11px;color:#8b9ab0;text-align:center;padding:0.5rem">Írj be egy folyó- vagy állomásnevet…</div>'; return; }
+                const found = window._allVizAttrs.filter(a => {
+                    const nev  = (a['vop.dbo.tAllomasFe.AllomasNev'] || '').toLowerCase();
+                    const foly = (a['vop.dbo.tAllomasFe.VizfolyasNev'] || '').toLowerCase();
+                    return nev.includes(term) || foly.includes(term);
+                });
+                el.innerHTML = found.length
+                    ? found.map(vizallasCard).join('')
+                    : '<div style="font-size:11px;color:#8b9ab0;text-align:center;padding:0.5rem">Nincs találat</div>';
+            }
+
+            window.setVizTab = setVizTab;
+            window.vizallasSearch = vizallasSearch;
+            window.renderVizTab = () => renderVizTab();
+            window.getVizActiveTab = () => vizActiveTab;
+
+            // Vízállás lista scroll — ne lapozzon a fő swipe
+            document.addEventListener('DOMContentLoaded', () => {
+                const vl = document.getElementById('vizallas-list');
+                if (vl) {
+                    vl.addEventListener('touchstart', e => e.stopPropagation(), { passive: true });
+                    vl.addEventListener('touchmove',  e => e.stopPropagation(), { passive: true });
+                }
+            });
+
+            // GPS koordináták
+            window._userLat = null;
+            window._userLon = null;
+
+            function computeVizKozel(features) {
+                const lat = window._userLat;
+                const lon = window._userLon;
+                if (!lat || !lon || !features.length) { window._vizKozel = []; return; }
+                const sorted = features.map(f => {
+                    const mx = f.geometry?.x || 0;
+                    const my = f.geometry?.y || 0;
+                    const fLon = mx / 20037508.34 * 180;
+                    const fLat = Math.atan(Math.exp(my / 20037508.34 * Math.PI)) * 360 / Math.PI - 90;
+                    const dx = fLon - lon;
+                    const dy = fLat - lat;
+                    return { attrs: f.attributes, dist: dx*dx + dy*dy };
+                }).sort((a,b) => a.dist - b.dist).slice(0, 3);
+                window._vizKozel = sorted.map(s => s.attrs);
+            }
+            window.computeVizKozel = computeVizKozel;
+
+            async function fetchVizallas() {
+                const listEl = document.getElementById('vizallas-list');
+                const timeEl = document.getElementById('vizallas-time');
+
+                // Azonnal megjelenítjük a cacheit adatot ha van
+                const CACHE_KEY = 'viz_features';
+                const CACHE_TS  = 'viz_features_ts';
+                const CACHE_MAX = 60 * 60 * 1000; // 1 óra — régebbit ne mutassuk
+                try {
+                    const cached = localStorage.getItem(CACHE_KEY);
+                    const cachedTs = parseInt(localStorage.getItem(CACHE_TS) || '0');
+                    if (cached && Date.now() - cachedTs < CACHE_MAX) {
+                        const cachedFeatures = JSON.parse(cached);
+                        window._allVizAttrs = cachedFeatures.map(f => f.attributes);
+                        window._vizFeatures = cachedFeatures;
+                        computeVizKozel(cachedFeatures);
+                        renderVizTab();
+                        if (timeEl) {
+                            const age = Math.round((Date.now() - cachedTs) / 60000);
+                            timeEl.textContent = `${age} perce mentett · frissül…`;
+                        }
+                    } else {
+                        // Nincs cache — töltő jelzés
+                        if (listEl) listEl.innerHTML = '<div style="font-size:11px;color:#8b9ab0;text-align:center;padding:1rem">⏳ Adatok betöltése…</div>';
+                    }
+                } catch(e) {
+                    if (listEl) listEl.innerHTML = '<div style="font-size:11px;color:#8b9ab0;text-align:center;padding:1rem">⏳ Adatok betöltése…</div>';
+                }
+
+                try {
+                const t0 = Date.now();
+                const fetchWithRetry = async (url, retries = 2) => {
+                    for (let i = 0; i < retries; i++) {
+                        const r = await fetch(url);
+                        if (r.ok) return r;
+                        if (r.status === 502 && i < retries - 1) {
+                            await new Promise(res => setTimeout(res, 1500));
+                            continue;
+                        }
+                        throw new Error(`HTTP ${r.status} — ${r.statusText}`);
+                    }
+                };
+                const res  = await fetchWithRetry(VIZUGY_PROXY + '?where=1%3D1');
+                if (!res.ok) throw new Error(`HTTP ${res.status} — ${res.statusText}`);
+                    const text = await res.text();
+                    let data;
+                    try { data = JSON.parse(text); } catch(pe) { throw new Error('JSON parse hiba: ' + text.substring(0, 100)); }
+                    if (data.error) throw new Error('API hiba: ' + data.error.message);
+                    const features = data.features || [];
+                    const allAttrs = features.map(f => f.attributes);
+
+                    window._allVizAttrs = allAttrs;
+                    window._vizFeatures = features;
+
+                    // Mentés localStorage-ba
+                    try {
+                        localStorage.setItem(CACHE_KEY, JSON.stringify(features));
+                        localStorage.setItem(CACHE_TS, Date.now().toString());
+                        console.log(`[vizallas] fetch: ${Date.now()-t0}ms, X-Cache: ${res.headers.get('X-Cache')||'MISS'}, X-Cache-Write: ${res.headers.get('X-Cache-Write')||'n/a'}, ${features.length} állomás`);
+                    } catch(e) {}
+
+                    // Időpont
+                    const firstTime = allAttrs[0]?.['vop.dbo.tAllomasFe.Idopont'];
+                    if (firstTime && timeEl) {
+                        const d = new Date(firstTime);
+                        const now = new Date();
+                        const isToday = d.toDateString() === now.toDateString();
+                        const dateStr = isToday
+                            ? d.toLocaleTimeString('hu-HU', { hour:'2-digit', minute:'2-digit' })
+                            : d.toLocaleDateString('hu-HU', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+                        timeEl.textContent = 'mérve: ' + dateStr;
+                    }
+
+                    // GPS közel számítás — ha GPS már megvan, azonnal; ha nincs, várunk
+                    if (window._userLat && window._userLon) {
+                        computeVizKozel(features);
+                        renderVizTab();
+                    } else {
+                        window._vizKozel = [];
+                        renderVizTab();
+                        // GPS-t kérünk és ha megérkezik frissítjük a közel listát
+                        navigator.geolocation?.getCurrentPosition(pos => {
+                            window._userLat = pos.coords.latitude;
+                            window._userLon = pos.coords.longitude;
+                            computeVizKozel(features);
+                            if (window._currentPage === 4 && vizActiveTab === 'kozel') renderVizTab();
+                        }, () => {}, { timeout: 5000, maximumAge: 300000 });
+                    }
+
+                } catch(e) {
+                    if (listEl) listEl.innerHTML = `<div style="font-size:11px;color:#f87171;text-align:center;padding:1rem">❌ ${e.message}<br><span style="color:#8b9ab0;font-size:10px">Ellenőrizd a vizugy-proxy.php elérhetőségét</span></div>`;
+                }
+            }
+
+            // ── AUTO FRISSÍTÉS ──────────────────────────────
+            window._lastFetch = Date.now();
+            window._lastVizFetch = 0;
+
+            function autoRefreshViz() {
+                const MIN_VIZ = 15 * 60 * 1000;
+                if (Date.now() - window._lastVizFetch < MIN_VIZ) return;
+                window._lastVizFetch = Date.now();
+                fetchVizallas();
+            }
+
+            function autoRefresh() {
+                const MIN_INTERVAL = 5 * 60 * 1000;
+                if (Date.now() - window._lastFetch < MIN_INTERVAL) return;
+                window._lastFetch = Date.now();
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(
+                        pos => fetchWeatherByCoords(pos.coords.latitude, pos.coords.longitude),
+                        ()  => { const c = document.getElementById('city-name').innerText; if (c) fetchWeather(c); }
+                    );
+                } else {
+                    const c = document.getElementById('city-name').innerText;
+                    if (c) fetchWeather(c);
+                }
+                autoRefreshViz();
+            }
+
+            // 30 percenként automatikusan
+            setInterval(autoRefresh, 30 * 60 * 1000);
+
+            // Előtérbe kerüléskor (PWA háttérből visszatérve)
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible') autoRefresh();
+            });
+        };
+    </script>
+</body>
+</html>
